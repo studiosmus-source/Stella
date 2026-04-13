@@ -1,0 +1,15 @@
+{
+  "name": "Stella",
+  "short_name": "Stella",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#120a07",
+  "theme_color": "#120a07",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

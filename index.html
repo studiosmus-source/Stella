@@ -1,0 +1,1221 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#120a07">
+<title>Stella ✦</title>
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="./icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+:root {
+  --bg: #120a07;
+  --surface: #1f1109;
+  --surface2: #2a1810;
+  --surface3: #351e14;
+  --accent: #e8956d;
+  --accent2: #c97b50;
+  --gold: #d4a853;
+  --text: #f7ede6;
+  --text-muted: #9a7060;
+  --border: #3a2016;
+  --tab-h: 66px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html, body { height:100%; overflow:hidden; }
+body {
+  font-family:'DM Sans',sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  display:flex;
+  flex-direction:column;
+  height:100dvh;
+}
+
+/* ── PAGES ── */
+.page {
+  display:none;
+  flex:1;
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+  padding-bottom:calc(var(--tab-h) + var(--safe-bottom) + 8px);
+}
+.page.active { display:block; }
+
+/* ── TAB BAR ── */
+.tab-bar {
+  position:fixed;
+  bottom:0; left:0; right:0;
+  height:calc(var(--tab-h) + var(--safe-bottom));
+  background:var(--surface);
+  border-top:1px solid var(--border);
+  display:flex;
+  align-items:flex-start;
+  z-index:100;
+}
+.tab-btn {
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:4px;
+  padding-top:10px;
+  height:var(--tab-h);
+  background:none;
+  border:none;
+  cursor:pointer;
+  color:var(--text-muted);
+  font-family:'DM Sans',sans-serif;
+  font-size:10px;
+  letter-spacing:0.08em;
+  text-transform:uppercase;
+  transition:color 0.2s;
+}
+.tab-btn.active { color:var(--accent); }
+.tab-btn svg { width:22px; height:22px; stroke:currentColor; }
+.tab-dot {
+  width:4px; height:4px;
+  border-radius:50%;
+  background:var(--accent);
+  display:none;
+  margin-top:1px;
+}
+.tab-btn.active .tab-dot { display:block; }
+
+/* ── METEO ── */
+.meteo-hero {
+  position:relative;
+  padding:52px 24px 28px;
+  background:linear-gradient(160deg, #2a1810 0%, #120a07 55%);
+  overflow:hidden;
+}
+.meteo-hero::after {
+  content:'';
+  position:absolute;
+  top:-60px; right:-60px;
+  width:260px; height:260px;
+  background:radial-gradient(circle, rgba(232,149,109,.12) 0%, transparent 65%);
+  border-radius:50%;
+  pointer-events:none;
+}
+.meteo-city-row {
+  display:flex;
+  align-items:center;
+  gap:6px;
+  margin-bottom:12px;
+}
+.meteo-city {
+  font-size:11px;
+  letter-spacing:0.2em;
+  text-transform:uppercase;
+  color:var(--text-muted);
+}
+.meteo-icon-big {
+  position:absolute;
+  right:24px; top:44px;
+  font-size:56px;
+  line-height:1;
+  filter:drop-shadow(0 4px 12px rgba(232,149,109,.3));
+}
+.meteo-temp {
+  font-family:'Cormorant Garamond',serif;
+  font-size:88px;
+  font-weight:300;
+  line-height:1;
+  display:flex;
+  align-items:flex-start;
+}
+.meteo-temp sup { font-size:36px; margin-top:12px; font-weight:300; }
+.meteo-desc {
+  font-size:13px;
+  color:var(--accent);
+  letter-spacing:0.06em;
+  margin-top:6px;
+}
+.meteo-minmax {
+  font-family:'Cormorant Garamond',serif;
+  font-size:18px;
+  color:var(--text-muted);
+  margin-top:2px;
+}
+
+.meteo-pills {
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:8px;
+  padding:16px 16px 0;
+}
+.meteo-pill {
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:14px 10px;
+  text-align:center;
+}
+.meteo-pill-val {
+  font-family:'Cormorant Garamond',serif;
+  font-size:22px;
+  color:var(--text);
+}
+.meteo-pill-lbl {
+  font-size:9px;
+  text-transform:uppercase;
+  letter-spacing:0.12em;
+  color:var(--text-muted);
+  margin-top:3px;
+}
+
+.forecast-row {
+  display:flex;
+  gap:8px;
+  padding:16px;
+  overflow-x:auto;
+  scrollbar-width:none;
+}
+.forecast-row::-webkit-scrollbar { display:none; }
+.fday {
+  flex:0 0 62px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:12px 6px;
+  text-align:center;
+}
+.fday.today { border-color:var(--accent); background:var(--surface2); }
+.fday-name { font-size:9px; text-transform:uppercase; letter-spacing:.1em; color:var(--text-muted); }
+.fday-icon { font-size:20px; margin:7px 0 5px; }
+.fday-max { font-family:'Cormorant Garamond',serif; font-size:18px; }
+.fday-min { font-size:10px; color:var(--text-muted); margin-top:1px; }
+
+.meteo-err {
+  padding:60px 24px;
+  text-align:center;
+  font-family:'Cormorant Garamond',serif;
+  font-size:20px;
+  color:var(--text-muted);
+  font-style:italic;
+}
+
+/* ── TESSERE ── */
+.page-header {
+  padding:44px 20px 12px;
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+}
+.page-title {
+  font-family:'Cormorant Garamond',serif;
+  font-size:30px;
+  font-style:italic;
+  font-weight:400;
+}
+.btn-add {
+  background:var(--accent);
+  color:var(--bg);
+  border:none;
+  border-radius:50px;
+  padding:9px 18px;
+  font-family:'DM Sans',sans-serif;
+  font-size:12px;
+  font-weight:500;
+  cursor:pointer;
+  letter-spacing:.04em;
+  flex-shrink:0;
+}
+
+.cards-list { padding:4px 16px 0; display:flex; flex-direction:column; gap:12px; }
+.empty-hint {
+  text-align:center;
+  padding:56px 20px;
+  font-family:'Cormorant Garamond',serif;
+  font-size:18px;
+  color:var(--text-muted);
+  font-style:italic;
+}
+
+.loyalty-card {
+  border-radius:18px;
+  padding:20px 20px 16px;
+  position:relative;
+  overflow:hidden;
+  cursor:pointer;
+}
+.loyalty-card::before {
+  content:'';
+  position:absolute;
+  top:-30px; right:-30px;
+  width:120px; height:120px;
+  background:rgba(255,255,255,.06);
+  border-radius:50%;
+}
+.lcard-store {
+  font-family:'Cormorant Garamond',serif;
+  font-size:24px;
+  font-weight:600;
+  letter-spacing:.01em;
+}
+.lcard-num { font-size:11px; opacity:.65; letter-spacing:.1em; margin:3px 0 14px; }
+.lcard-bc {
+  background:#fff;
+  border-radius:8px;
+  padding:10px 12px 6px;
+  text-align:center;
+}
+.lcard-bc svg { max-width:100%; display:block; }
+.lcard-del {
+  position:absolute;
+  top:12px; right:12px;
+  background:rgba(0,0,0,.2);
+  border:none;
+  border-radius:50%;
+  width:28px; height:28px;
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer;
+  color:rgba(255,255,255,.75);
+  font-size:13px;
+}
+
+/* ── MODAL ── */
+.modal-bg {
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.72);
+  z-index:200;
+  align-items:flex-end;
+  justify-content:center;
+}
+.modal-bg.open { display:flex; }
+.modal-box {
+  background:var(--surface2);
+  border-radius:24px 24px 0 0;
+  padding:28px 20px calc(32px + var(--safe-bottom));
+  width:100%;
+  max-width:500px;
+}
+.modal-box h3 {
+  font-family:'Cormorant Garamond',serif;
+  font-size:24px;
+  font-style:italic;
+  margin-bottom:20px;
+}
+.modal-box label {
+  display:block;
+  font-size:10px;
+  text-transform:uppercase;
+  letter-spacing:.15em;
+  color:var(--text-muted);
+  margin-bottom:6px;
+  margin-top:16px;
+}
+.modal-box input, .modal-box select {
+  width:100%;
+  background:var(--surface3);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:13px 14px;
+  color:var(--text);
+  font-family:'DM Sans',sans-serif;
+  font-size:15px;
+  outline:none;
+}
+.modal-box select { -webkit-appearance:none; }
+.modal-actions { display:flex; gap:10px; margin-top:24px; }
+.btn-primary {
+  flex:1;
+  background:var(--accent);
+  color:var(--bg);
+  border:none;
+  border-radius:50px;
+  padding:14px;
+  font-family:'DM Sans',sans-serif;
+  font-size:14px;
+  font-weight:500;
+  cursor:pointer;
+}
+.btn-cancel {
+  flex:0 0 88px;
+  background:var(--surface3);
+  color:var(--text-muted);
+  border:1px solid var(--border);
+  border-radius:50px;
+  padding:14px;
+  font-family:'DM Sans',sans-serif;
+  font-size:14px;
+  cursor:pointer;
+}
+
+/* ── GOSSIP ── */
+.gossip-header {
+  padding:44px 20px 8px;
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+}
+.gossip-refresh {
+  background:none;
+  border:1px solid var(--border);
+  color:var(--text-muted);
+  border-radius:50%;
+  width:32px; height:32px;
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer;
+  font-size:15px;
+}
+.filters {
+  display:flex;
+  gap:8px;
+  padding:0 16px 14px;
+  overflow-x:auto;
+  scrollbar-width:none;
+}
+.filters::-webkit-scrollbar { display:none; }
+.chip {
+  flex-shrink:0;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:50px;
+  padding:7px 15px;
+  font-size:12px;
+  cursor:pointer;
+  color:var(--text-muted);
+  transition:all .15s;
+}
+.chip.on { background:var(--accent); color:var(--bg); border-color:var(--accent); }
+
+.news-list { padding:0 16px; display:flex; flex-direction:column; gap:10px; }
+.news-card {
+  display:flex;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:16px;
+  overflow:hidden;
+  text-decoration:none;
+  color:inherit;
+}
+.news-thumb {
+  width:96px;
+  flex:0 0 96px;
+  object-fit:cover;
+}
+.news-thumb-ph {
+  width:96px;
+  flex:0 0 96px;
+  background:var(--surface2);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:26px;
+}
+.news-body { padding:13px 14px; flex:1; min-width:0; }
+.news-src {
+  font-size:9px;
+  text-transform:uppercase;
+  letter-spacing:.18em;
+  color:var(--accent);
+  margin-bottom:5px;
+}
+.news-title {
+  font-family:'Cormorant Garamond',serif;
+  font-size:15px;
+  line-height:1.4;
+  display:-webkit-box;
+  -webkit-line-clamp:3;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
+}
+.news-date { font-size:10px; color:var(--text-muted); margin-top:7px; }
+.loading-state {
+  text-align:center;
+  padding:56px 20px;
+  font-family:'Cormorant Garamond',serif;
+  font-size:20px;
+  color:var(--text-muted);
+  font-style:italic;
+}
+/* ── FULLSCREEN BARCODE ── */
+.bc-full-bg {
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.92);
+  z-index:400;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:20px;
+  padding:24px;
+}
+.bc-full-bg.open { display:flex; }
+.bc-full-store {
+  font-family:'Cormorant Garamond',serif;
+  font-size:32px;
+  font-style:italic;
+  color:#f7ede6;
+}
+.bc-full-num { font-size:12px; letter-spacing:.15em; color:#9a7060; }
+.bc-full-wrap {
+  background:#fff;
+  border-radius:16px;
+  padding:20px 24px;
+  width:100%;
+  max-width:360px;
+  text-align:center;
+}
+.bc-full-wrap svg { width:100%; }
+.bc-full-close {
+  background:none;
+  border:1px solid #3a2016;
+  color:#9a7060;
+  border-radius:50px;
+  padding:10px 32px;
+  font-family:'DM Sans',sans-serif;
+  font-size:13px;
+  cursor:pointer;
+  margin-top:8px;
+}
+/* inline delete confirm */
+.del-confirm {
+  position:absolute;
+  inset:0;
+  border-radius:18px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:12px;
+  background:rgba(0,0,0,.75);
+  backdrop-filter:blur(4px);
+}
+.del-confirm p { color:#f7ede6; font-size:14px; }
+.del-confirm-btns { display:flex; gap:10px; }
+.del-yes { background:#c0392b; color:#fff; border:none; border-radius:50px; padding:10px 22px; font-size:13px; cursor:pointer; }
+.del-no  { background:rgba(255,255,255,.15); color:#f7ede6; border:none; border-radius:50px; padding:10px 22px; font-size:13px; cursor:pointer; }
+.scanner-bg {
+  display:none;
+  position:fixed;
+  inset:0;
+  background:#000;
+  z-index:300;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+}
+.scanner-bg.open { display:flex; }
+.scanner-title {
+  color:#f7ede6;
+  font-family:'Cormorant Garamond',serif;
+  font-size:20px;
+  font-style:italic;
+  margin-bottom:20px;
+}
+#scanner-view {
+  width:min(340px,90vw);
+  border-radius:16px;
+  overflow:hidden;
+  border:2px solid #e8956d;
+}
+#scanner-view video { display:block; }
+.scanner-hint {
+  color:#9a7060;
+  font-size:12px;
+  margin-top:16px;
+  text-align:center;
+  letter-spacing:0.05em;
+}
+.btn-scanner-close {
+  margin-top:24px;
+  background:none;
+  border:1px solid #3a2016;
+  color:#9a7060;
+  border-radius:50px;
+  padding:10px 28px;
+  font-family:'DM Sans',sans-serif;
+  font-size:13px;
+  cursor:pointer;
+}
+.btn-scan {
+  background:var(--surface3);
+  border:1px solid var(--border);
+  color:var(--text-muted);
+  border-radius:10px;
+  padding:13px 16px;
+  font-size:18px;
+  cursor:pointer;
+  flex-shrink:0;
+}
+.num-row { display:flex; gap:8px; }
+.spin { display:inline-block; animation:spin 1.2s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* ── SPLASH ── */
+.splash {
+  position:fixed;
+  inset:0;
+  background:var(--bg);
+  z-index:999;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  transition:opacity .7s ease;
+}
+.splash.hide { opacity:0; pointer-events:none; }
+.splash-star {
+  font-size:28px;
+  animation:splashpulse 2s ease-in-out infinite;
+}
+@keyframes splashpulse { 0%,100%{opacity:.3;transform:scale(.85)} 50%{opacity:1;transform:scale(1.1)} }
+.splash-greeting {
+  font-family:'Cormorant Garamond',serif;
+  font-size:13px;
+  letter-spacing:.28em;
+  text-transform:uppercase;
+  color:var(--text-muted);
+  margin-top:8px;
+}
+.splash-name {
+  font-family:'Cormorant Garamond',serif;
+  font-size:52px;
+  font-weight:300;
+  font-style:italic;
+  color:var(--text);
+  letter-spacing:.02em;
+}
+/* ── IMPOSTAZIONI ── */
+.settings-section-title {
+  font-size:10px;
+  text-transform:uppercase;
+  letter-spacing:.18em;
+  color:var(--text-muted);
+  margin:0 4px 10px;
+}
+.settings-card {
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:16px;
+  overflow:hidden;
+}
+.settings-row {
+  display:flex;
+  align-items:center;
+  gap:14px;
+  padding:16px;
+  cursor:pointer;
+}
+.settings-row:active { background:var(--surface2); }
+.settings-row-icon { font-size:20px; flex-shrink:0; }
+.settings-row-body { flex:1; }
+.settings-row-label { font-size:14px; color:var(--text); }
+.settings-row-hint { font-size:11px; color:var(--text-muted); margin-top:2px; }
+.settings-row-arrow { color:var(--text-muted); font-size:20px; }
+.settings-divider { height:1px; background:var(--border); margin:0 16px; }
+</style>
+</head>
+<body>
+
+<!-- ══ SPLASH ══ -->
+<div class="splash" id="splash">
+  <div class="splash-star">✦</div>
+  <div class="splash-greeting" id="splash-greeting">Buongiorno</div>
+  <div class="splash-name">Rita</div>
+</div>
+
+<!-- ══ METEO ══ -->
+<div class="page active" id="page-meteo">
+  <div id="meteo-content">
+    <div class="meteo-err">
+      <span class="spin">✦</span>&ensp;Localizzazione in corso...
+    </div>
+  </div>
+</div>
+
+<!-- ══ TESSERE ══ -->
+<div class="page" id="page-tessere">
+  <div class="page-header">
+    <span class="page-title">Le mie tessere</span>
+    <button class="btn-add" onclick="openModal()">+ Aggiungi</button>
+  </div>
+  <div class="cards-list" id="cards-list"></div>
+</div>
+
+<!-- ══ GOSSIP ══ -->
+<div class="page" id="page-gossip">
+  <div class="gossip-header">
+    <span class="page-title">Gossip</span>
+    <button class="gossip-refresh" onclick="reloadGossip()" title="Aggiorna">↺</button>
+  </div>
+  <div class="news-list" id="news-list">
+    <div class="loading-state">Carico notizie...</div>
+  </div>
+</div>
+
+<!-- ══ TAB BAR ══ -->
+<nav class="tab-bar">
+  <button class="tab-btn active" id="tab-meteo" onclick="goTab('meteo')">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round">
+      <circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/>
+      <line x1="12" y1="20" x2="12" y2="22"/><line x1="2" y1="12" x2="4" y2="12"/>
+      <line x1="20" y1="12" x2="22" y2="12"/><line x1="4.93" y1="4.93" x2="6.34" y2="6.34"/>
+      <line x1="17.66" y1="17.66" x2="19.07" y2="19.07"/><line x1="4.93" y1="19.07" x2="6.34" y2="17.66"/>
+      <line x1="17.66" y1="6.34" x2="19.07" y2="4.93"/>
+    </svg>
+    Meteo
+    <div class="tab-dot"></div>
+  </button>
+  <button class="tab-btn" id="tab-tessere" onclick="goTab('tessere')">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round">
+      <rect x="2" y="5" width="20" height="14" rx="2"/>
+      <line x1="2" y1="10" x2="22" y2="10"/>
+      <line x1="6" y1="15" x2="10" y2="15"/>
+    </svg>
+    Tessere
+    <div class="tab-dot"></div>
+  </button>
+  <button class="tab-btn" id="tab-gossip" onclick="goTab('gossip')">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+    </svg>
+    Gossip
+    <div class="tab-dot"></div>
+  </button>
+  <button class="tab-btn" id="tab-impostazioni" onclick="goTab('impostazioni')">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+    </svg>
+    Altro
+    <div class="tab-dot"></div>
+  </button>
+</nav>
+
+<!-- ══ MODAL TESSERA ══ -->
+<div class="modal-bg" id="modal">
+  <div class="modal-box">
+    <h3>Nuova tessera</h3>
+    <label>Supermercato</label>
+    <select id="m-store">
+      <option>Esselunga</option><option>Conad</option><option>Coop</option>
+      <option>Carrefour</option><option>Lidl</option><option>Pam</option>
+      <option>Penny</option><option>Bennet</option><option>Il Gigante</option>
+      <option>MD</option><option>Eurospin</option><option>Aldi</option>
+      <option value="Altro">Altro...</option>
+    </select>
+    <div id="custom-name-row" style="display:none">
+      <label>Nome personalizzato</label>
+      <input id="m-custom" type="text" placeholder="Es. Farmacia, Libreria...">
+    </div>
+    <label>Numero tessera</label>
+    <div class="num-row">
+      <input id="m-num" type="text" placeholder="0000000000000" inputmode="numeric" autocomplete="off">
+      <button class="btn-scan" onclick="openScanner()" title="Scansiona">📷</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Annulla</button>
+      <button class="btn-primary" onclick="saveCard()">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ IMPOSTAZIONI ══ -->
+<div class="page" id="page-impostazioni">
+  <div class="page-header" style="padding-bottom:4px;">
+    <span class="page-title">Impostazioni</span>
+  </div>
+
+  <div style="padding:8px 16px 0;">
+    <div class="settings-section-title">Tessere fedeltà</div>
+
+    <div class="settings-card">
+      <div class="settings-row" onclick="exportCards()">
+        <div class="settings-row-icon">💾</div>
+        <div class="settings-row-body">
+          <div class="settings-row-label">Esporta tessere</div>
+          <div class="settings-row-hint">Salva un file di backup sul telefono</div>
+        </div>
+        <div class="settings-row-arrow">›</div>
+      </div>
+      <div class="settings-divider"></div>
+      <div class="settings-row" onclick="document.getElementById('import-input').click()">
+        <div class="settings-row-icon">📂</div>
+        <div class="settings-row-body">
+          <div class="settings-row-label">Importa tessere</div>
+          <div class="settings-row-hint">Ripristina da un file di backup</div>
+        </div>
+        <div class="settings-row-arrow">›</div>
+      </div>
+    </div>
+    <input id="import-input" type="file" accept=".json" style="display:none" onchange="importCards(event)">
+
+    <div class="settings-section-title" style="margin-top:28px;">Meteo</div>
+    <div class="settings-card">
+      <div class="settings-row" onclick="resetCity()">
+        <div class="settings-row-icon">📍</div>
+        <div class="settings-row-body">
+          <div class="settings-row-label">Cambia città</div>
+          <div class="settings-row-hint" id="settings-city-hint">—</div>
+        </div>
+        <div class="settings-row-arrow">›</div>
+      </div>
+    </div>
+
+    <div id="settings-toast" style="display:none;margin-top:20px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px 16px;font-size:13px;color:var(--accent);text-align:center;"></div>
+  </div>
+</div>
+
+<!-- ══ FULLSCREEN BARCODE ══ -->
+<div class="bc-full-bg" id="bc-full">
+  <div class="bc-full-store" id="bcf-store"></div>
+  <div class="bc-full-num" id="bcf-num"></div>
+  <div class="bc-full-wrap"><svg id="bcf-svg"></svg></div>
+  <button class="bc-full-close" onclick="closeBcFull()">✕ Chiudi</button>
+</div>
+
+<!-- ══ SCANNER ══ -->
+<div class="scanner-bg" id="scanner-bg">
+  <div class="scanner-title">Inquadra il codice</div>
+  <div id="scanner-view"></div>
+  <div class="scanner-hint">Barcode · QR Code · Tessere fedeltà</div>
+  <button class="btn-scanner-close" onclick="closeScanner()">✕ Annulla</button>
+</div>
+
+<script>
+// ══ NAV ══
+const TABS = ['meteo','tessere','gossip','impostazioni'];
+function goTab(name) {
+  TABS.forEach(t => {
+    document.getElementById('page-'+t).classList.toggle('active', t===name);
+    document.getElementById('tab-'+t).classList.toggle('active', t===name);
+  });
+  if (name==='gossip' && !gossipLoaded) loadGossip();
+  if (name==='impostazioni') refreshSettingsHints();
+}
+
+// ══════════════════════════════
+// METEO
+// ══════════════════════════════
+const WMO = {
+  0:['☀️','Sereno'],1:['🌤️','Poco nuvoloso'],2:['⛅','Parzialmente nuvoloso'],3:['🌥️','Coperto'],
+  45:['🌫️','Nebbia'],48:['🌫️','Nebbia ghiacciata'],
+  51:['🌦️','Pioggerella leggera'],53:['🌦️','Pioggerella'],55:['🌧️','Pioggerella intensa'],
+  61:['🌧️','Pioggia leggera'],63:['🌧️','Pioggia'],65:['🌧️','Pioggia intensa'],
+  71:['🌨️','Neve leggera'],73:['❄️','Neve'],75:['❄️','Neve intensa'],
+  77:['🌨️','Granuli di neve'],
+  80:['🌦️','Rovesci leggeri'],81:['🌧️','Rovesci'],82:['⛈️','Rovesci forti'],
+  85:['🌨️','Rovesci di neve'],86:['❄️','Rovesci di neve intensi'],
+  95:['⛈️','Temporale'],96:['⛈️','Temporale con grandine'],99:['⛈️','Temporale forte']
+};
+const GG = ['Dom','Lun','Mar','Mer','Gio','Ven','Sab'];
+function wmo(c){ return WMO[c]||['🌡️','—']; }
+
+async function loadMeteo() {
+  // Città salvata? Usa quella direttamente
+  const saved = localStorage.getItem('stella_city');
+  if (saved) {
+    const {lat,lon,city} = JSON.parse(saved);
+    await fetchAndRenderMeteo(lat, lon, city);
+    return;
+  }
+  const IP_SERVICES = [
+    async () => { const d = await fetch('https://ipapi.co/json/').then(r=>r.json()); return {lat:d.latitude,lon:d.longitude,city:d.city||d.region||''}; },
+    async () => { const d = await fetch('https://freeipapi.com/api/json').then(r=>r.json()); return {lat:d.latitude,lon:d.longitude,city:d.cityName||''}; },
+    async () => { const d = await fetch('https://ipwho.is/').then(r=>r.json()); if(!d.success) throw 0; return {lat:d.latitude,lon:d.longitude,city:d.city||''}; },
+  ];
+  let loc = null;
+  for (const svc of IP_SERVICES) {
+    try { loc = await svc(); if (loc?.lat) break; } catch(e) {}
+  }
+  if (!loc) { showMeteoInput(); return; }
+  await fetchAndRenderMeteo(loc.lat, loc.lon, loc.city);
+}
+
+async function loadMeteoByCity(cityName) {
+  try {
+    const geo = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cityName)}&count=1&language=it&format=json`).then(r=>r.json());
+    if (!geo.results?.length) { showMeteoErr('Città non trovata'); return; }
+    const {latitude:lat,longitude:lon,name:city} = geo.results[0];
+    localStorage.setItem('stella_city', JSON.stringify({lat,lon,city}));
+    await fetchAndRenderMeteo(lat, lon, city);
+  } catch(e) { showMeteoErr('Errore. Controlla la connessione.'); }
+}
+
+async function fetchAndRenderMeteo(lat, lon, city) {
+  try {
+    const weather = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weathercode,windspeed_10m,relativehumidity_2m&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_probability_max&timezone=auto&forecast_days=7`).then(r=>r.json());
+      const c = weather.current;
+      const d = weather.daily;
+      const [icon, desc] = wmo(c.weathercode);
+      const rainPct = d.precipitation_probability_max[0] ?? 0;
+
+      let forecastHTML = '';
+      for (let i=0; i<7; i++) {
+        const dt = new Date(d.time[i]+'T00:00:00');
+        const [fi] = wmo(d.weathercode[i]);
+        forecastHTML += `<div class="fday ${i===0?'today':''}">
+          <div class="fday-name">${i===0?'Oggi':GG[dt.getDay()]}</div>
+          <div class="fday-icon">${fi}</div>
+          <div class="fday-max">${Math.round(d.temperature_2m_max[i])}°</div>
+          <div class="fday-min">${Math.round(d.temperature_2m_min[i])}°</div>
+        </div>`;
+      }
+
+      document.getElementById('meteo-content').innerHTML = `
+        <div class="meteo-hero">
+          <div class="meteo-icon-big">${icon}</div>
+          <div class="meteo-city-row">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9a7060" stroke-width="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+            <span class="meteo-city">${city}</span>
+            <button onclick="changeCity()" style="background:none;border:none;color:#9a7060;font-size:10px;cursor:pointer;letter-spacing:.08em;text-transform:uppercase;margin-left:4px">cambia</button>
+          </div>
+          <div class="meteo-temp">${Math.round(c.temperature_2m)}<sup>°C</sup></div>
+          <div class="meteo-desc">${desc}</div>
+          <div class="meteo-minmax">${Math.round(d.temperature_2m_min[0])}° / ${Math.round(d.temperature_2m_max[0])}°</div>
+        </div>
+        <div class="meteo-pills">
+          <div class="meteo-pill">
+            <div class="meteo-pill-val">${c.relativehumidity_2m}%</div>
+            <div class="meteo-pill-lbl">Umidità</div>
+          </div>
+          <div class="meteo-pill">
+            <div class="meteo-pill-val">${Math.round(c.windspeed_10m)}</div>
+            <div class="meteo-pill-lbl">km/h vento</div>
+          </div>
+          <div class="meteo-pill">
+            <div class="meteo-pill-val">${rainPct}%</div>
+            <div class="meteo-pill-lbl">Pioggia</div>
+          </div>
+        </div>
+        <div class="forecast-row">${forecastHTML}</div>`;
+  } catch(e) { showMeteoErr('Errore meteo. Controlla la connessione.'); }
+}
+
+function showMeteoInput() {
+  document.getElementById('meteo-content').innerHTML = `
+    <div class="meteo-err">
+      <div style="margin-bottom:20px">Inserisci la tua città</div>
+      <div style="display:flex;gap:8px;max-width:300px;margin:0 auto">
+        <input id="city-input" type="text" placeholder="Es. Milano"
+          style="flex:1;background:#1f1109;border:1px solid #3a2016;border-radius:12px;padding:12px 14px;color:#f7ede6;font-family:'DM Sans',sans-serif;font-size:15px;outline:none"
+          onkeydown="if(event.key==='Enter')searchCity()">
+        <button onclick="searchCity()"
+          style="background:#e8956d;color:#120a07;border:none;border-radius:12px;padding:12px 18px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;cursor:pointer">→</button>
+      </div>
+    </div>`;
+  setTimeout(()=>document.getElementById('city-input')?.focus(), 100);
+}
+
+function searchCity() {
+  const val = document.getElementById('city-input')?.value?.trim();
+  if (!val) return;
+  document.getElementById('meteo-content').innerHTML = '<div class="meteo-err"><span class="spin">✦</span>&ensp;Cerco...</div>';
+  loadMeteoByCity(val);
+}
+
+function changeCity() {
+  localStorage.removeItem('stella_city');
+  showMeteoInput();
+}
+
+function showMeteoErr(msg) {
+  document.getElementById('meteo-content').innerHTML = `<div class="meteo-err">${msg}</div>`;
+}
+
+// ══════════════════════════════
+// TESSERE
+// ══════════════════════════════
+const COLORS = {
+  'Esselunga':['#d42b2b','#fff'],'Conad':['#c0392b','#fff'],'Coop':['#1a6eb5','#fff'],
+  'Carrefour':['#003087','#fff'],'Lidl':['#ebb800','#003087'],'Pam':['#d63010','#fff'],
+  'Penny':['#bb0000','#fff'],'Bennet':['#d94f00','#fff'],'Il Gigante':['#1a7a1a','#fff'],
+  'MD':['#e65c00','#fff'],'Eurospin':['#d40000','#fff'],'Aldi':['#005ca9','#fff'],
+  'Altro':['#4a3530','#f7ede6']
+};
+
+let cards = JSON.parse(localStorage.getItem('stella_cards')||'[]');
+function persist() { localStorage.setItem('stella_cards', JSON.stringify(cards)); }
+
+function renderCards() {
+  const el = document.getElementById('cards-list');
+  if (!cards.length) { el.innerHTML='<div class="empty-hint">Nessuna tessera ancora. ✦</div>'; return; }
+  el.innerHTML = cards.map((c,i)=>{
+    const [bg,fg] = COLORS[c.store]||COLORS['Altro'];
+    return `<div class="loyalty-card" id="card-${i}" style="background:${bg};color:${fg};position:relative" onclick="openBcFull(${i})">
+      <button class="lcard-del" onclick="askDel(${i},event)">✕</button>
+      <div class="lcard-store">${c.store}</div>
+      <div class="lcard-num">${c.number}</div>
+      <div class="lcard-bc"><svg id="bc${i}"></svg></div>
+    </div>`;
+  }).join('');
+  cards.forEach((_,i)=>{
+    setTimeout(()=>{
+      try {
+        JsBarcode('#bc'+i, cards[i].number, {
+          format:'CODE128', displayValue:false,
+          background:'#ffffff', lineColor:'#000000',
+          height:50, margin:0, width:1.8
+        });
+      } catch(e){}
+    }, 60);
+  });
+}
+
+function askDel(i, e) {
+  e.stopPropagation();
+  const card = document.getElementById('card-'+i);
+  const [,fg] = COLORS[cards[i].store]||COLORS['Altro'];
+  const confirm = document.createElement('div');
+  confirm.className = 'del-confirm';
+  confirm.innerHTML = `<p>Eliminare "${cards[i].store}"?</p>
+    <div class="del-confirm-btns">
+      <button class="del-no" onclick="this.closest('.del-confirm').remove()">No</button>
+      <button class="del-yes" onclick="doDelCard(${i})">Sì, elimina</button>
+    </div>`;
+  card.appendChild(confirm);
+}
+
+function doDelCard(i) {
+  cards.splice(i,1); persist(); renderCards();
+}
+
+function openBcFull(i) {
+  const c = cards[i];
+  document.getElementById('bcf-store').textContent = c.store;
+  document.getElementById('bcf-num').textContent = c.number;
+  document.getElementById('bcf-svg').innerHTML = '';
+  document.getElementById('bc-full').classList.add('open');
+  setTimeout(()=>{
+    try {
+      JsBarcode('#bcf-svg', c.number, {
+        format:'CODE128', displayValue:true,
+        background:'#ffffff', lineColor:'#000000',
+        height:80, margin:4, fontSize:14
+      });
+    } catch(e){}
+  }, 50);
+}
+
+function closeBcFull() {
+  document.getElementById('bc-full').classList.remove('open');
+}
+
+function openModal() {
+  document.getElementById('modal').classList.add('open');
+  document.getElementById('m-num').focus();
+}
+function closeModal() { document.getElementById('modal').classList.remove('open'); }
+
+document.getElementById('m-store').addEventListener('change', function(){
+  document.getElementById('custom-name-row').style.display = this.value==='Altro' ? 'block' : 'none';
+});
+
+function saveCard() {
+  const storeVal = document.getElementById('m-store').value;
+  const storeName = storeVal==='Altro' ? (document.getElementById('m-custom').value.trim()||'Altro') : storeVal;
+  const num = document.getElementById('m-num').value.trim();
+  if (!num) { document.getElementById('m-num').focus(); return; }
+  cards.push({store:storeName, number:num});
+  persist(); renderCards(); closeModal();
+  document.getElementById('m-num').value='';
+  document.getElementById('m-custom').value='';
+  document.getElementById('m-store').selectedIndex=0;
+  document.getElementById('custom-name-row').style.display='none';
+}
+
+// ══════════════════════════════
+// GOSSIP
+// ══════════════════════════════
+const FEEDS = [
+  {url:'https://www.gossip.it/feed/',             src:'Gossip.it', lang:'it', em:'✨'},
+  {url:'https://www.today.it/tag/gossip/rss.xml', src:'Today',     lang:'it', em:'🌸'},
+];
+let allNews = [];
+let gossipLoaded = false;
+let activeFilter = 'all';
+
+function setFilter(f, el) {
+  activeFilter = f;
+  document.querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));
+  el.classList.add('on');
+  renderNews();
+}
+
+function renderNews() {
+  const el = document.getElementById('news-list');
+  const list = activeFilter==='all' ? allNews : allNews.filter(a=>a.lang===activeFilter);
+  if (!list.length) { el.innerHTML='<div class="loading-state">Nessun articolo disponibile</div>'; return; }
+  el.innerHTML = list.map(a=>`
+    <a class="news-card" href="${a.link}" target="_blank" rel="noopener">
+      ${a.thumb
+        ? `<img class="news-thumb" src="${a.thumb}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+        : ''}
+      <div class="news-thumb-ph" style="${a.thumb?'display:none':'display:flex'}">${a.em}</div>
+      <div class="news-body">
+        <div class="news-src">${a.src}</div>
+        <div class="news-title">${a.title}</div>
+        <div class="news-date">${a.date}</div>
+      </div>
+    </a>`).join('');
+}
+
+async function fetchFeed(feed) {
+  const PROXIES = [
+    url => [`https://corsproxy.io/?${encodeURIComponent(url)}`, 'text'],
+    url => [`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`, 'allorigins'],
+    url => [`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`, 'text'],
+  ];
+  for (const makeProxy of PROXIES) {
+    try {
+      const [proxyUrl, mode] = makeProxy(feed.url);
+      const r = await fetch(proxyUrl, {signal:AbortSignal.timeout(9000)});
+      let xmlStr;
+      if (mode === 'allorigins') { const j = await r.json(); xmlStr = j.contents; }
+      else { xmlStr = await r.text(); }
+      if (!xmlStr || xmlStr.length < 100) continue;
+      const doc = new DOMParser().parseFromString(xmlStr,'text/xml');
+      const items = Array.from(doc.querySelectorAll('item')).slice(0,12);
+      if (!items.length) continue;
+      return items.map(item=>{
+        const title = (item.querySelector('title')?.textContent||'').replace(/<!\[CDATA\[|\]\]>/g,'').trim();
+        const link  = (item.querySelector('link')?.textContent || item.querySelector('guid')?.textContent||'#').trim();
+        const rawDate = item.querySelector('pubDate')?.textContent||'';
+        const enc = item.querySelector('enclosure');
+        const media = item.querySelector('content');
+        const descHtml = item.querySelector('description')?.textContent||'';
+        const imgMatch = descHtml.match(/src=["']([^"']+\.(?:jpe?g|png|webp))/i);
+        let thumb = '';
+        if (enc?.getAttribute('type')?.startsWith('image')) thumb = enc.getAttribute('url')||'';
+        else if (media?.getAttribute('url')) thumb = media.getAttribute('url');
+        else if (imgMatch) thumb = imgMatch[1];
+        const date = rawDate ? new Date(rawDate).toLocaleDateString('it-IT',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+        return {title, link, thumb, date, rawDate, src:feed.src, lang:feed.lang, em:feed.em};
+      });
+    } catch(e) { continue; }
+  }
+  return [];
+}
+
+async function loadGossip() {
+  gossipLoaded = true;
+  document.getElementById('news-list').innerHTML = '<div class="loading-state"><span class="spin">✦</span>&ensp;Carico notizie...</div>';
+  const res = await Promise.all(FEEDS.map(f=>fetchFeed(f)));
+  allNews = res.flat().sort((a,b)=>{
+    if (!a.rawDate) return 1; if (!b.rawDate) return -1;
+    return new Date(b.rawDate)-new Date(a.rawDate);
+  });
+  if (!allNews.length) {
+    document.getElementById('news-list').innerHTML='<div class="loading-state">Nessuna notizia caricata.<br><small>Controlla la connessione.</small></div>';
+  } else { renderNews(); }
+}
+
+function reloadGossip() { gossipLoaded=false; loadGossip(); }
+
+// ══════════════════════════════
+// SCANNER
+// ══════════════════════════════
+let scanner = null;
+
+async function openScanner() {
+  document.getElementById('scanner-bg').classList.add('open');
+  try {
+    scanner = new Html5Qrcode('scanner-view');
+    await scanner.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: { width: 260, height: 160 }, aspectRatio: 1.6 },
+      (decodedText) => {
+        // Strip non-numeric prefix for loyalty cards if needed
+        document.getElementById('m-num').value = decodedText;
+        closeScanner();
+      },
+      () => {}
+    );
+  } catch(e) {
+    closeScanner();
+    alert('Fotocamera non disponibile. Inserisci il numero manualmente.');
+  }
+}
+
+async function closeScanner() {
+  document.getElementById('scanner-bg').classList.remove('open');
+  if (scanner) {
+    try { await scanner.stop(); scanner.clear(); } catch(e) {}
+    scanner = null;
+  }
+}
+
+// ══════════════════════════════
+// IMPOSTAZIONI
+// ══════════════════════════════
+function showToast(msg) {
+  const t = document.getElementById('settings-toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  setTimeout(() => { t.style.display = 'none'; }, 3000);
+}
+
+function refreshSettingsHints() {
+  const saved = localStorage.getItem('stella_city');
+  const hint = document.getElementById('settings-city-hint');
+  if (hint) hint.textContent = saved ? JSON.parse(saved).city : 'Non impostata';
+}
+
+function exportCards() {
+  if (!cards.length) { showToast('Nessuna tessera da esportare.'); return; }
+  const blob = new Blob([JSON.stringify(cards, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'tessere_rita.json';
+  a.click();
+  showToast('✓ File salvato!');
+}
+
+function importCards(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!Array.isArray(data)) throw new Error();
+      cards = data;
+      persist();
+      renderCards();
+      showToast(`✓ ${cards.length} tessere importate!`);
+    } catch { showToast('File non valido.'); }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+function resetCity() {
+  localStorage.removeItem('stella_city');
+  goTab('meteo');
+  showMeteoInput();
+}
+
+// ══ INIT ══
+// Service Worker
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
+// Splash
+(function() {
+  const h = new Date().getHours();
+  const greet = h < 12 ? 'Buongiorno' : h < 18 ? 'Buon pomeriggio' : 'Buonasera';
+  document.getElementById('splash-greeting').textContent = greet;
+  setTimeout(() => {
+    document.getElementById('splash').classList.add('hide');
+    setTimeout(() => document.getElementById('splash').remove(), 700);
+  }, 2000);
+})();
+loadMeteo();
+renderCards();
+</script>
+</body>
+</html>
