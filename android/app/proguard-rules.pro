@@ -1,0 +1,2 @@
+-keep class com.studiosmus.stella.** { *; }
+-keepattributes *Annotation*
