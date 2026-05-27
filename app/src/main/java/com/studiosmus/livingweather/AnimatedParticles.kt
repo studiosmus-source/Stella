@@ -8,13 +8,13 @@ import kotlin.math.sin
 import kotlin.random.Random
 
 class RainSystem(private val w: Int, private val h: Int) {
-    private val count = (w * 0.35f).toInt().coerceIn(60, 400)
-    private val x = FloatArray(count) { Random.nextFloat() * (w + 100f) - 50f }
+    private val count = (w * 0.5f).toInt().coerceIn(100, 600)
+    private val x = FloatArray(count) { Random.nextFloat() * (w + 120f) - 60f }
     private val y = FloatArray(count) { Random.nextFloat() * h }
-    private val speed = FloatArray(count) { Random.nextFloat() * 500f + 350f }
-    private val len = FloatArray(count) { Random.nextFloat() * 28f + 10f }
-    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = 1.6f }
+    private val speed = FloatArray(count) { Random.nextFloat() * 900f + 700f }  // 700–1600 px/s
+    private val len = FloatArray(count) { Random.nextFloat() * 50f + 22f }       // 22–72 px
 
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = 1.8f }
     private val sinA = sin(Math.toRadians(22.0)).toFloat()
     private val cosA = cos(Math.toRadians(22.0)).toFloat()
 
@@ -24,8 +24,8 @@ class RainSystem(private val w: Int, private val h: Int) {
             y[i] += s * cosA
             x[i] += s * sinA
             if (y[i] > h + len[i]) {
-                y[i] = -len[i]
-                x[i] = Random.nextFloat() * (w + 50f) - 25f
+                y[i] = -len[i] - Random.nextFloat() * 40f
+                x[i] = Random.nextFloat() * (w + 80f) - 40f
             }
         }
     }
@@ -33,19 +33,20 @@ class RainSystem(private val w: Int, private val h: Int) {
     fun draw(canvas: Canvas, intensity: Float) {
         val n = (count * intensity).toInt()
         for (i in 0 until n) {
-            paint.color = Color.argb((90 + (i % 90)).coerceAtMost(200), 170, 215, 245)
+            val alpha = (140 + ((y[i] * 0.05f).toInt() and 0x3F)).coerceIn(140, 210)
+            paint.color = Color.argb(alpha, 170, 215, 245)
             canvas.drawLine(x[i], y[i], x[i] + len[i] * sinA, y[i] + len[i] * cosA, paint)
         }
     }
 }
 
 class SnowSystem(private val w: Int, private val h: Int) {
-    private val count = (w * h / 3500).coerceIn(40, 300)
+    private val count = (w * h / 3000).coerceIn(50, 350)
     private val x = FloatArray(count) { Random.nextFloat() * w }
     private val y = FloatArray(count) { Random.nextFloat() * h }
-    private val speed = FloatArray(count) { Random.nextFloat() * 65f + 30f }
-    private val radius = FloatArray(count) { Random.nextFloat() * 4.5f + 1f }
-    private val sway = FloatArray(count) { (Random.nextFloat() - 0.5f) * 18f }
+    private val speed = FloatArray(count) { Random.nextFloat() * 90f + 50f }
+    private val radius = FloatArray(count) { Random.nextFloat() * 5f + 1.5f }
+    private val sway = FloatArray(count) { (Random.nextFloat() - 0.5f) * 22f }
     private var time = 0f
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
@@ -64,7 +65,7 @@ class SnowSystem(private val w: Int, private val h: Int) {
     fun draw(canvas: Canvas, intensity: Float) {
         val n = (count * intensity).toInt()
         for (i in 0 until n) {
-            val alpha = (130 + (i % 100)).coerceAtMost(230)
+            val alpha = (130 + ((y[i] * 0.04f).toInt() and 0x5F)).coerceIn(130, 230)
             paint.color = Color.argb(alpha, 255, 255, 255)
             canvas.drawCircle(x[i], y[i], radius[i], paint)
         }

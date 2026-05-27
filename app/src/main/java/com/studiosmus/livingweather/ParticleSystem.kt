@@ -51,8 +51,11 @@ object ParticleSystem {
     }
 
     fun drawInfoOverlay(canvas: Canvas, temp: Double, condition: WeatherCondition, w: Int, h: Int) {
+        val tempSize = (h * 0.22f).coerceAtMost(110f)
+        val condSize = (h * 0.08f).coerceAtMost(44f)
+        val stripH = (h * 0.28f).coerceAtMost(340f)
+
         // Semi-transparent bottom strip
-        val stripH = h * 0.30f
         paint.shader = LinearGradient(
             0f, h - stripH, 0f, h.toFloat(),
             Color.argb(160, 0, 0, 0), Color.TRANSPARENT,
@@ -64,14 +67,14 @@ object ParticleSystem {
         // Temperature
         paint.color = Color.WHITE
         paint.setShadowLayer(6f, 0f, 2f, Color.argb(180, 0, 0, 0))
-        paint.textSize = h * 0.28f
+        paint.textSize = tempSize
         paint.isFakeBoldText = true
-        canvas.drawText("${temp.toInt()}°", w * 0.06f, h * 0.88f, paint)
+        canvas.drawText("${temp.toInt()}°", w * 0.06f, h - stripH + tempSize * 1.15f, paint)
 
         // Condition label
-        paint.textSize = h * 0.10f
+        paint.textSize = condSize
         paint.isFakeBoldText = false
-        canvas.drawText(condition.label, w * 0.06f, h * 0.97f, paint)
+        canvas.drawText(condition.label, w * 0.06f, h - condSize * 0.4f, paint)
         paint.clearShadowLayer()
     }
 

@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Matrix
+import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.service.wallpaper.WallpaperService
@@ -39,12 +40,16 @@ class LivingWeatherWallpaperService : WallpaperService() {
 
         private val drawRunnable = object : Runnable {
             override fun run() {
-                val now = System.currentTimeMillis()
+                val start = System.currentTimeMillis()
                 val dt = if (lastFrameMs == 0L) 0.016f
-                         else ((now - lastFrameMs) / 1000f).coerceAtMost(0.1f)
-                lastFrameMs = now
+                         else ((start - lastFrameMs) / 1000f).coerceAtMost(0.05f)
+                lastFrameMs = start
                 drawFrame(dt)
-                if (visible) handler.postDelayed(this, FRAME_MS)
+                if (visible) {
+                    // Schedule next frame accounting for render time → smooth 60fps
+                    val renderMs = System.currentTimeMillis() - start
+                    handler.postDelayed(this, (FRAME_MS - renderMs).coerceAtLeast(0))
+                }
             }
         }
 
@@ -101,7 +106,10 @@ class LivingWeatherWallpaperService : WallpaperService() {
             val holder = surfaceHolder
             var canvas: Canvas? = null
             try {
-                canvas = holder.lockCanvas() ?: return
+                // Hardware canvas (GPU) on API 26+ for smooth rendering
+                canvas = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                    holder.lockHardwareCanvas() else holder.lockCanvas()
+                canvas ?: return
                 renderFrame(canvas, dt)
             } finally {
                 canvas?.let { holder.unlockCanvasAndPost(it) }
@@ -127,10 +135,10 @@ class LivingWeatherWallpaperService : WallpaperService() {
             // 3. Animated weather effects
             when (condition) {
                 WeatherCondition.DRIZZLE -> {
-                    rain?.update(dt, 0.5f); rain?.draw(canvas, 0.3f)
+                    rain?.update(dt, 0.75f); rain?.draw(canvas, 0.4f)
                 }
                 WeatherCondition.RAIN -> {
-                    rain?.update(dt); rain?.draw(canvas, 0.7f)
+                    rain?.update(dt); rain?.draw(canvas, 0.75f)
                 }
                 WeatherCondition.HEAVY_RAIN -> {
                     ParticleSystem.drawDarkOverlay(canvas, w, h, 80)
@@ -184,6 +192,6 @@ class LivingWeatherWallpaperService : WallpaperService() {
         const val PREFS = "LivingWeatherPrefs"
         const val KEY_BG = "live_bg"
         const val WEATHER_ID = -1
-        private const val FRAME_MS = 42L // ~24 fps
+        private const val FRAME_MS = 16L // target 60 fps
     }
 }
