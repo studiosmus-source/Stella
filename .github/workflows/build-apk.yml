@@ -19,32 +19,22 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Download Gradle wrapper jar
-        run: |
-          curl -L -o gradle/wrapper/gradle-wrapper.jar \
-            "https://github.com/gradle/gradle/raw/v8.6.0/gradle/wrapper/gradle-wrapper.jar"
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+      - name: Install Android platform 34 and build tools
+        run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
 
-      - name: Accept Android SDK licenses
-        run: yes | sdkmanager --licenses || true
-        env:
-          ANDROID_HOME: /usr/local/lib/android/sdk
-
-      - name: Install required Android SDK components
-        run: |
-          sdkmanager "platforms;android-34" "build-tools;34.0.0"
-        env:
-          ANDROID_HOME: /usr/local/lib/android/sdk
+      - name: Setup Gradle 8.6
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: "8.6"
 
       - name: Create local.properties
-        run: echo "sdk.dir=/usr/local/lib/android/sdk" > local.properties
+        run: echo "sdk.dir=$ANDROID_HOME" > local.properties
 
       - name: Build debug APK
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
-        env:
-          ANDROID_HOME: /usr/local/lib/android/sdk
+        run: gradle assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
