@@ -47,6 +47,17 @@ class WeatherConfigActivity : AppCompatActivity() {
         if (granted) openLegacyPicker() else showPermissionError()
     }
 
+    // ─── Location permission request ─────────────────────────────────────────
+    private val locationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { results ->
+        val granted = results.values.any { it }
+        if (granted) loadWeatherAsync()
+        else {
+            binding.tvWeatherStatus.text = getString(R.string.weather_unavailable)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityConfigBinding.inflate(layoutInflater)
@@ -67,7 +78,18 @@ class WeatherConfigActivity : AppCompatActivity() {
         binding.btnSave.setOnClickListener { saveAndFinish() }
         binding.btnSave.isEnabled = false
 
-        loadWeatherAsync()
+        requestLocationAndLoadWeather()
+    }
+
+    private fun requestLocationAndLoadWeather() {
+        val coarse = Manifest.permission.ACCESS_COARSE_LOCATION
+        val fine = Manifest.permission.ACCESS_FINE_LOCATION
+        val hasLocation = ContextCompat.checkSelfPermission(this, coarse) == PackageManager.PERMISSION_GRANTED
+        if (hasLocation) {
+            loadWeatherAsync()
+        } else {
+            locationPermissionLauncher.launch(arrayOf(fine, coarse))
+        }
     }
 
     private fun openImagePicker() {
