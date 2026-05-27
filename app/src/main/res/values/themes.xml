@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.LivingWeather" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">@color/seed_color</item>
+        <item name="colorPrimaryVariant">#1A5CB8</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="android:windowBackground">@color/bg_dark</item>
+        <item name="android:statusBarColor">@color/bg_dark</item>
+    </style>
+</resources>

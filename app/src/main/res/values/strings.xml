@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">LivingWeather</string>
+    <string name="widget_label">LivingWeather</string>
+    <string name="widget_description">Mostra il tuo sfondo con gli effetti meteo animati in tempo reale</string>
+    <string name="widget_image_desc">Widget meteo</string>
+    <string name="config_title">Configura LivingWeather</string>
+    <string name="config_subtitle">Scegli uno sfondo: la pioggia, la neve e l\'illuminazione cambieranno automaticamente</string>
+    <string name="btn_pick_image">Scegli sfondo</string>
+    <string name="btn_save">Aggiungi widget</string>
+    <string name="loading_weather">Recupero meteo in corso…</string>
+    <string name="weather_unavailable">Meteo non disponibile (attiva la posizione)</string>
+    <string name="permission_denied">Permesso negato. Abilitalo nelle impostazioni.</string>
+    <string name="image_error">Impossibile caricare l\'immagine</string>
+    <string name="preview_desc">Anteprima widget</string>
+</resources>

@@ -1,0 +1,3 @@
+-keep class com.studiosmus.livingweather.** { *; }
+-keepattributes *Annotation*
+-dontwarn org.json.**

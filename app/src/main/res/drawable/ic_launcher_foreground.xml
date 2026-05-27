@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Cloud with rain drops — LivingWeather icon -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Cloud body -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M72,52 C72,46 67,42 61,43
+                          C59,37 53,33 46,33
+                          C38,33 31,39 31,47
+                          C25,47 20,52 20,58
+                          C20,64 25,69 31,69
+                          L72,69
+                          C78,69 83,64 83,58
+                          C83,54 80,51 76,50
+                          Z" />
+
+    <!-- Rain drops -->
+    <path
+        android:fillColor="#AAD4F5"
+        android:pathData="M36,74 L33,84 L39,84 Z" />
+    <path
+        android:fillColor="#AAD4F5"
+        android:pathData="M52,74 L49,84 L55,84 Z" />
+    <path
+        android:fillColor="#AAD4F5"
+        android:pathData="M68,74 L65,84 L71,84 Z" />
+    <path
+        android:fillColor="#AAD4F5"
+        android:pathData="M44,80 L41,90 L47,90 Z" />
+    <path
+        android:fillColor="#AAD4F5"
+        android:pathData="M60,80 L57,90 L63,90 Z" />
+
+</vector>
