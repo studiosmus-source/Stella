@@ -45,4 +45,6 @@ dependencies {
     implementation(libs.material)
     implementation(libs.work.runtime.ktx)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.activity.ktx)
+    implementation(libs.constraintlayout)
 }

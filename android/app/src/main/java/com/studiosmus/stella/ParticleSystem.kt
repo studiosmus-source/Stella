@@ -4,6 +4,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.RadialGradient
 import android.graphics.Shader
 import kotlin.math.cos
 import kotlin.math.sin
@@ -11,183 +12,184 @@ import kotlin.random.Random
 
 object ParticleSystem {
 
-    private val rainPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = 1.8f }
-    private val snowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val overlayPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.WHITE
-        setShadowLayer(4f, 0f, 0f, Color.BLACK)
-    }
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
     fun drawWeatherEffect(
         canvas: Canvas,
         condition: WeatherCondition,
         timeOfDay: TimeOfDay,
         seed: Long,
-        width: Int,
-        height: Int
+        w: Int,
+        h: Int
     ) {
-        drawTimeOverlay(canvas, timeOfDay, width, height)
+        drawTimeOverlay(canvas, timeOfDay, w, h)
         when (condition) {
-            WeatherCondition.RAIN -> drawRain(canvas, width, height, 0.6f, seed)
+            WeatherCondition.CLEAR_DAY -> drawSunGlow(canvas, w, h)
+            WeatherCondition.CLEAR_NIGHT -> drawNightOverlay(canvas, w, h, seed)
+            WeatherCondition.PARTLY_CLOUDY_DAY, WeatherCondition.PARTLY_CLOUDY_NIGHT ->
+                drawDarkOverlay(canvas, w, h, 25)
+            WeatherCondition.OVERCAST -> drawDarkOverlay(canvas, w, h, 60)
+            WeatherCondition.FOG -> drawFog(canvas, w, h)
+            WeatherCondition.DRIZZLE -> drawRain(canvas, w, h, 0.3f, seed)
+            WeatherCondition.RAIN -> drawRain(canvas, w, h, 0.65f, seed)
             WeatherCondition.HEAVY_RAIN -> {
-                darkenCanvas(canvas, width, height, 80)
-                drawRain(canvas, width, height, 1.0f, seed)
+                drawDarkOverlay(canvas, w, h, 90)
+                drawRain(canvas, w, h, 1.0f, seed)
             }
-            WeatherCondition.DRIZZLE -> drawRain(canvas, width, height, 0.3f, seed)
-            WeatherCondition.SNOW -> drawSnow(canvas, width, height, 0.5f, seed)
+            WeatherCondition.SNOW -> drawSnow(canvas, w, h, 0.5f, seed)
             WeatherCondition.HEAVY_SNOW -> {
-                drawWhiteHaze(canvas, width, height, 60)
-                drawSnow(canvas, width, height, 1.0f, seed)
+                drawWhiteHaze(canvas, w, h, 55)
+                drawSnow(canvas, w, h, 1.0f, seed)
             }
             WeatherCondition.THUNDERSTORM -> {
-                darkenCanvas(canvas, width, height, 100)
-                drawRain(canvas, width, height, 1.0f, seed)
-                drawLightning(canvas, width, height, seed)
+                drawDarkOverlay(canvas, w, h, 110)
+                drawRain(canvas, w, h, 1.0f, seed)
+                drawLightning(canvas, w, h, seed)
             }
-            WeatherCondition.FOG -> drawFog(canvas, width, height)
-            WeatherCondition.OVERCAST -> darkenCanvas(canvas, width, height, 50)
-            WeatherCondition.PARTLY_CLOUDY_DAY, WeatherCondition.PARTLY_CLOUDY_NIGHT ->
-                darkenCanvas(canvas, width, height, 20)
-            WeatherCondition.CLEAR_DAY -> drawSunGlow(canvas, width, height)
-            WeatherCondition.CLEAR_NIGHT -> drawStars(canvas, width, height, seed)
         }
     }
 
-    fun drawInfo(canvas: Canvas, temp: Double, condition: WeatherCondition, width: Int, height: Int) {
-        textPaint.textSize = height * 0.12f
-        val tempStr = "${temp.toInt()}°"
-        canvas.drawText(tempStr, width * 0.08f, height * 0.22f, textPaint)
+    fun drawInfoOverlay(canvas: Canvas, temp: Double, condition: WeatherCondition, w: Int, h: Int) {
+        val tempSize = (h * 0.22f).coerceAtMost(110f)
+        val condSize = (h * 0.08f).coerceAtMost(44f)
+        val stripH = (h * 0.28f).coerceAtMost(340f)
 
-        textPaint.textSize = height * 0.07f
-        canvas.drawText(condition.label, width * 0.08f, height * 0.36f, textPaint)
+        paint.shader = LinearGradient(
+            0f, h - stripH, 0f, h.toFloat(),
+            Color.argb(160, 0, 0, 0), Color.TRANSPARENT,
+            Shader.TileMode.CLAMP
+        )
+        canvas.drawRect(0f, h - stripH, w.toFloat(), h.toFloat(), paint)
+        paint.shader = null
+
+        paint.color = Color.WHITE
+        paint.setShadowLayer(6f, 0f, 2f, Color.argb(180, 0, 0, 0))
+        paint.textSize = tempSize
+        paint.isFakeBoldText = true
+        canvas.drawText("${temp.toInt()}°", w * 0.06f, h - stripH + tempSize * 1.15f, paint)
+
+        paint.textSize = condSize
+        paint.isFakeBoldText = false
+        canvas.drawText(condition.label, w * 0.06f, h - condSize * 0.4f, paint)
+        paint.clearShadowLayer()
     }
 
-    private val WeatherCondition.label get() = when (this) {
-        WeatherCondition.CLEAR_DAY -> "Sereno"
-        WeatherCondition.CLEAR_NIGHT -> "Sereno"
-        WeatherCondition.PARTLY_CLOUDY_DAY, WeatherCondition.PARTLY_CLOUDY_NIGHT -> "Parzialmente nuvoloso"
-        WeatherCondition.OVERCAST -> "Nuvoloso"
-        WeatherCondition.FOG -> "Nebbia"
-        WeatherCondition.DRIZZLE -> "Pioggerella"
-        WeatherCondition.RAIN -> "Pioggia"
-        WeatherCondition.HEAVY_RAIN -> "Pioggia intensa"
-        WeatherCondition.SNOW -> "Neve"
-        WeatherCondition.HEAVY_SNOW -> "Neve intensa"
-        WeatherCondition.THUNDERSTORM -> "Temporale"
-    }
-
-    private fun drawTimeOverlay(canvas: Canvas, timeOfDay: TimeOfDay, width: Int, height: Int) {
+    internal fun drawTimeOverlay(canvas: Canvas, timeOfDay: TimeOfDay, w: Int, h: Int) {
         val (color, alpha) = when (timeOfDay) {
-            TimeOfDay.DAWN -> Pair(Color.rgb(255, 140, 60), 70)
-            TimeOfDay.MORNING -> Pair(Color.rgb(255, 220, 120), 25)
+            TimeOfDay.DAWN -> Pair(Color.rgb(255, 140, 60), 75)
+            TimeOfDay.MORNING -> Pair(Color.rgb(255, 225, 130), 28)
             TimeOfDay.AFTERNOON -> return
-            TimeOfDay.GOLDEN_HOUR -> Pair(Color.rgb(255, 120, 20), 80)
-            TimeOfDay.DUSK -> Pair(Color.rgb(120, 60, 160), 85)
-            TimeOfDay.NIGHT -> Pair(Color.rgb(10, 15, 50), 130)
+            TimeOfDay.GOLDEN_HOUR -> Pair(Color.rgb(255, 110, 20), 85)
+            TimeOfDay.DUSK -> Pair(Color.rgb(110, 50, 150), 90)
+            TimeOfDay.NIGHT -> Pair(Color.rgb(8, 12, 45), 135)
         }
-        overlayPaint.color = color
-        overlayPaint.alpha = alpha
-        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), overlayPaint)
+        paint.color = color
+        paint.alpha = alpha
+        canvas.drawRect(0f, 0f, w.toFloat(), h.toFloat(), paint)
+        paint.alpha = 255
     }
 
-    private fun drawRain(canvas: Canvas, width: Int, height: Int, intensity: Float, seed: Long) {
-        val rng = Random(seed)
-        val angle = Math.toRadians(20.0)
-        val dropCount = (width * intensity * 0.4f).toInt()
-        val dropLen = height * 0.07f
+    internal fun drawSunGlow(canvas: Canvas, w: Int, h: Int) {
+        paint.shader = RadialGradient(
+            w * 0.75f, h * 0.15f, h * 0.5f,
+            Color.argb(60, 255, 235, 100), Color.TRANSPARENT,
+            Shader.TileMode.CLAMP
+        )
+        canvas.drawRect(0f, 0f, w.toFloat(), h.toFloat(), paint)
+        paint.shader = null
+    }
 
-        repeat(dropCount) {
-            val x = rng.nextFloat() * (width + dropLen)
-            val y = rng.nextFloat() * height
-            val alpha = (rng.nextFloat() * 100 + 80).toInt()
-            rainPaint.color = Color.argb(alpha, 174, 214, 241)
+    internal fun drawNightOverlay(canvas: Canvas, w: Int, h: Int, seed: Long) {
+        val rng = Random(seed / 60)
+        val count = w * h / 3500
+        paint.color = Color.WHITE
+        repeat(count) {
+            val x = rng.nextFloat() * w
+            val y = rng.nextFloat() * h * 0.75f
+            val r = rng.nextFloat() * 1.6f + 0.4f
+            paint.alpha = (rng.nextFloat() * 180 + 70).toInt()
+            canvas.drawCircle(x, y, r, paint)
+        }
+        paint.alpha = 255
+    }
+
+    internal fun drawWhiteHaze(canvas: Canvas, w: Int, h: Int, alpha: Int) {
+        paint.color = Color.WHITE
+        paint.alpha = alpha
+        canvas.drawRect(0f, 0f, w.toFloat(), h.toFloat(), paint)
+        paint.alpha = 255
+    }
+
+    internal fun drawDarkOverlay(canvas: Canvas, w: Int, h: Int, alpha: Int) {
+        paint.color = Color.BLACK
+        paint.alpha = alpha
+        canvas.drawRect(0f, 0f, w.toFloat(), h.toFloat(), paint)
+        paint.alpha = 255
+    }
+
+    private fun drawRain(canvas: Canvas, w: Int, h: Int, intensity: Float, seed: Long) {
+        val rng = Random(seed)
+        val angle = Math.toRadians(22.0)
+        val dropLen = h * 0.075f
+        val count = (w * intensity * 0.45f).toInt()
+
+        paint.strokeWidth = 1.6f
+        repeat(count) {
+            val x = rng.nextFloat() * (w + dropLen)
+            val y = rng.nextFloat() * h
+            val alpha = (rng.nextFloat() * 110 + 75).toInt()
+            paint.color = Color.argb(alpha, 170, 215, 245)
             canvas.drawLine(
                 x, y,
                 x + (dropLen * sin(angle)).toFloat(),
                 y + (dropLen * cos(angle)).toFloat(),
-                rainPaint
+                paint
             )
         }
     }
 
-    private fun drawSnow(canvas: Canvas, width: Int, height: Int, intensity: Float, seed: Long) {
+    private fun drawSnow(canvas: Canvas, w: Int, h: Int, intensity: Float, seed: Long) {
         val rng = Random(seed)
-        val flakeCount = (width * height / 3000 * intensity).toInt()
-
-        repeat(flakeCount) {
-            val x = rng.nextFloat() * width
-            val y = rng.nextFloat() * height
-            val radius = rng.nextFloat() * 5f + 1.5f
-            val alpha = (rng.nextFloat() * 150 + 100).toInt()
-            snowPaint.color = Color.argb(alpha, 255, 255, 255)
-            canvas.drawCircle(x, y, radius, snowPaint)
+        val count = (w * h / 2800 * intensity).toInt()
+        repeat(count) {
+            val x = rng.nextFloat() * w
+            val y = rng.nextFloat() * h
+            val r = rng.nextFloat() * 5.5f + 1.5f
+            val alpha = (rng.nextFloat() * 155 + 100).toInt()
+            paint.color = Color.argb(alpha, 255, 255, 255)
+            canvas.drawCircle(x, y, r, paint)
         }
     }
 
-    private fun darkenCanvas(canvas: Canvas, width: Int, height: Int, alpha: Int) {
-        overlayPaint.color = Color.argb(alpha, 0, 0, 0)
-        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), overlayPaint)
-    }
-
-    private fun drawWhiteHaze(canvas: Canvas, width: Int, height: Int, alpha: Int) {
-        overlayPaint.color = Color.argb(alpha, 255, 255, 255)
-        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), overlayPaint)
-    }
-
-    private fun drawFog(canvas: Canvas, width: Int, height: Int) {
-        val gradient = LinearGradient(
-            0f, height * 0.3f, 0f, height.toFloat(),
-            Color.argb(180, 200, 200, 210),
-            Color.argb(40, 200, 200, 210),
-            Shader.TileMode.CLAMP
-        )
-        overlayPaint.shader = gradient
-        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), overlayPaint)
-        overlayPaint.shader = null
-        drawWhiteHaze(canvas, width, height, 60)
-    }
-
-    private fun drawSunGlow(canvas: Canvas, width: Int, height: Int) {
-        val gradient = LinearGradient(
-            0f, 0f, 0f, height * 0.4f,
-            Color.argb(50, 255, 220, 100),
-            Color.TRANSPARENT,
-            Shader.TileMode.CLAMP
-        )
-        overlayPaint.shader = gradient
-        canvas.drawRect(0f, 0f, width.toFloat(), height * 0.5f, overlayPaint)
-        overlayPaint.shader = null
-    }
-
-    private fun drawStars(canvas: Canvas, width: Int, height: Int, seed: Long) {
-        val rng = Random(seed / 3600)
-        val starCount = (width * height / 4000)
-        snowPaint.color = Color.WHITE
-        repeat(starCount) {
-            val x = rng.nextFloat() * width
-            val y = rng.nextFloat() * height * 0.7f
-            val r = rng.nextFloat() * 1.5f + 0.5f
-            snowPaint.alpha = (rng.nextFloat() * 180 + 75).toInt()
-            canvas.drawCircle(x, y, r, snowPaint)
-        }
-    }
-
-    private fun drawLightning(canvas: Canvas, width: Int, height: Int, seed: Long) {
-        if (seed % 5 != 0L) return
+    private fun drawLightning(canvas: Canvas, w: Int, h: Int, seed: Long) {
+        if (seed % 6 != 0L) return
         val rng = Random(seed)
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(200, 255, 255, 180)
-            strokeWidth = 3f
-        }
-        val startX = rng.nextFloat() * width
-        var x = startX
+        paint.color = Color.argb(210, 255, 255, 190)
+        paint.strokeWidth = 3.5f
+        paint.color = Color.WHITE
+        paint.alpha = 35
+        canvas.drawRect(0f, 0f, w.toFloat(), h.toFloat(), paint)
+        paint.alpha = 255
+        paint.color = Color.argb(210, 255, 255, 190)
+
+        var x = w * 0.3f + rng.nextFloat() * w * 0.4f
         var y = 0f
-        while (y < height * 0.6f) {
-            val nx = x + (rng.nextFloat() - 0.5f) * 40f
-            val ny = y + rng.nextFloat() * 40f + 20f
+        while (y < h * 0.65f) {
+            val nx = x + (rng.nextFloat() - 0.5f) * 50f
+            val ny = y + rng.nextFloat() * 45f + 20f
             canvas.drawLine(x, y, nx, ny, paint)
             x = nx; y = ny
         }
+    }
+
+    private fun drawFog(canvas: Canvas, w: Int, h: Int) {
+        paint.shader = LinearGradient(
+            0f, 0f, 0f, h.toFloat(),
+            Color.argb(170, 210, 210, 220),
+            Color.argb(50, 210, 210, 220),
+            Shader.TileMode.CLAMP
+        )
+        canvas.drawRect(0f, 0f, w.toFloat(), h.toFloat(), paint)
+        paint.shader = null
     }
 }

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Stella</string>
+    <string name="widget_label">Stella Weather</string>
+    <string name="widget_description">Mostra il tuo sfondo con gli effetti meteo animati in tempo reale</string>
+    <string name="widget_image_desc">Widget meteo</string>
+    <string name="config_title">Configura Stella</string>
+    <string name="config_subtitle">Scegli uno sfondo: la pioggia, la neve e l\'illuminazione cambieranno automaticamente</string>
+    <string name="btn_pick_image">Scegli sfondo</string>
+    <string name="btn_save">Aggiungi widget</string>
+    <string name="loading_weather">Recupero meteo in corso…</string>
+    <string name="weather_unavailable">Meteo non disponibile (attiva la posizione)</string>
+    <string name="permission_denied">Permesso negato. Abilitalo nelle impostazioni.</string>
+    <string name="image_error">Impossibile caricare l\'immagine</string>
+    <string name="preview_desc">Anteprima</string>
+    <string name="wallpaper_description">Sfondo animato con effetti meteo in tempo reale</string>
+    <string name="main_subtitle">Scegli uno sfondo: pioggia, neve e luce cambieranno live</string>
+    <string name="btn_set_wallpaper">Imposta come sfondo live</string>
+</resources>

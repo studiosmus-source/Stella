@@ -10,9 +10,26 @@ import java.net.URL
 
 object WeatherFetcher {
 
+    private const val PREFS = "WeatherFetcherCache"
+    private const val KEY_LAT = "lat"
+    private const val KEY_LON = "lon"
+
     suspend fun fetch(context: Context): WeatherData? = withContext(Dispatchers.IO) {
-        val location = getLastKnownLocation(context) ?: return@withContext null
-        fetchFromApi(location.latitude, location.longitude)
+        val location = getLastKnownLocation(context)
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+        val lat: Double
+        val lon: Double
+        if (location != null) {
+            lat = location.latitude
+            lon = location.longitude
+            prefs.edit().putFloat(KEY_LAT, lat.toFloat()).putFloat(KEY_LON, lon.toFloat()).apply()
+        } else {
+            if (!prefs.contains(KEY_LAT)) return@withContext null
+            lat = prefs.getFloat(KEY_LAT, 0f).toDouble()
+            lon = prefs.getFloat(KEY_LON, 0f).toDouble()
+        }
+        fetchFromApi(lat, lon)
     }
 
     suspend fun fetchByCoords(lat: Double, lon: Double): WeatherData? =

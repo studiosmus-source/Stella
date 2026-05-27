@@ -24,6 +24,20 @@ enum class WeatherCondition {
     SNOW, HEAVY_SNOW,
     THUNDERSTORM;
 
+    val label: String
+        get() = when (this) {
+            CLEAR_DAY, CLEAR_NIGHT -> "Sereno"
+            PARTLY_CLOUDY_DAY, PARTLY_CLOUDY_NIGHT -> "Parz. nuvoloso"
+            OVERCAST -> "Nuvoloso"
+            FOG -> "Nebbia"
+            DRIZZLE -> "Pioggerella"
+            RAIN -> "Pioggia"
+            HEAVY_RAIN -> "Pioggia intensa"
+            SNOW -> "Neve"
+            HEAVY_SNOW -> "Neve intensa"
+            THUNDERSTORM -> "Temporale"
+        }
+
     companion object {
         fun fromCode(code: Int, isDay: Boolean): WeatherCondition = when (code) {
             0 -> if (isDay) CLEAR_DAY else CLEAR_NIGHT
