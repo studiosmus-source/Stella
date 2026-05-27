@@ -15,6 +15,7 @@
     <uses-permission
         android:name="android.permission.USE_EXACT_ALARM"
         android:minSdkVersion="33" />
+    <uses-permission android:name="android.permission.SET_WALLPAPER" />
 
     <application
         android:allowBackup="true"
@@ -23,6 +24,31 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.LivingWeather">
+
+        <!-- Main Activity (icona nel cassetto app) -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Live Wallpaper Service -->
+        <service
+            android:name=".LivingWeatherWallpaperService"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_WALLPAPER"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.wallpaper.WallpaperService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.wallpaper"
+                android:resource="@xml/wallpaper" />
+        </service>
 
         <!-- Widget Provider -->
         <receiver
@@ -38,7 +64,7 @@
                 android:resource="@xml/widget_info" />
         </receiver>
 
-        <!-- Config Activity (aperta quando si aggiunge il widget) -->
+        <!-- Widget Config Activity -->
         <activity
             android:name=".WeatherConfigActivity"
             android:exported="true"
@@ -49,7 +75,7 @@
             </intent-filter>
         </activity>
 
-        <!-- Boot receiver: riavvia gli aggiornamenti dopo il riavvio -->
+        <!-- Boot receiver -->
         <receiver
             android:name=".BootReceiver"
             android:exported="true">

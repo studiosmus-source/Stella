@@ -77,7 +77,7 @@ object ParticleSystem {
 
     // ─── Time of day overlays ─────────────────────────────────────────────────
 
-    private fun drawTimeOverlay(canvas: Canvas, timeOfDay: TimeOfDay, w: Int, h: Int) {
+    internal fun drawTimeOverlay(canvas: Canvas, timeOfDay: TimeOfDay, w: Int, h: Int) {
         val (color, alpha) = when (timeOfDay) {
             TimeOfDay.DAWN -> Pair(Color.rgb(255, 140, 60), 75)
             TimeOfDay.MORNING -> Pair(Color.rgb(255, 225, 130), 28)
@@ -89,7 +89,7 @@ object ParticleSystem {
         drawSolidOverlay(canvas, w, h, color, alpha)
     }
 
-    private fun drawSunGlow(canvas: Canvas, w: Int, h: Int) {
+    internal fun drawSunGlow(canvas: Canvas, w: Int, h: Int) {
         paint.shader = RadialGradient(
             w * 0.75f, h * 0.15f, h * 0.5f,
             Color.argb(60, 255, 235, 100), Color.TRANSPARENT,
@@ -99,7 +99,7 @@ object ParticleSystem {
         paint.shader = null
     }
 
-    private fun drawNightOverlay(canvas: Canvas, w: Int, h: Int, seed: Long) {
+    internal fun drawNightOverlay(canvas: Canvas, w: Int, h: Int, seed: Long) {
         // Stars — seed changes only every hour so they stay fixed
         val rng = Random(seed / 60)
         val count = w * h / 3500
@@ -171,7 +171,7 @@ object ParticleSystem {
         }
     }
 
-    private fun drawFog(canvas: Canvas, w: Int, h: Int) {
+    internal fun drawFog(canvas: Canvas, w: Int, h: Int) {
         paint.shader = LinearGradient(
             0f, 0f, 0f, h.toFloat(),
             Color.argb(170, 210, 210, 220),
@@ -184,10 +184,10 @@ object ParticleSystem {
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
 
-    private fun drawDarkOverlay(canvas: Canvas, w: Int, h: Int, alpha: Int) =
+    internal fun drawDarkOverlay(canvas: Canvas, w: Int, h: Int, alpha: Int) =
         drawSolidOverlay(canvas, w, h, Color.BLACK, alpha)
 
-    private fun drawWhiteHaze(canvas: Canvas, w: Int, h: Int, alpha: Int) =
+    internal fun drawWhiteHaze(canvas: Canvas, w: Int, h: Int, alpha: Int) =
         drawSolidOverlay(canvas, w, h, Color.WHITE, alpha)
 
     private fun drawSolidOverlay(canvas: Canvas, w: Int, h: Int, color: Int, alpha: Int) {
