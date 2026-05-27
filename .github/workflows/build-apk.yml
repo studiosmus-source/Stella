@@ -22,11 +22,16 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Accept Android licenses
-        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+      - name: Verify Android SDK
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          ls $ANDROID_HOME/cmdline-tools/latest/bin/
+          ls $ANDROID_HOME/platforms/ || echo "(no platforms yet)"
+          ls $ANDROID_HOME/build-tools/ || echo "(no build-tools yet)"
 
       - name: Install Android SDK platform 34
         run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
           $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
             "platforms;android-34" \
             "build-tools;34.0.0"
@@ -40,9 +45,14 @@ jobs:
           gradle-version: "8.6"
 
       - name: Build debug APK
-        run: gradle assembleDebug --no-daemon --stacktrace
+        run: gradle assembleDebug --no-daemon --stacktrace --info 2>&1 | tee build.log; exit ${PIPESTATUS[0]}
+
+      - name: Show last 80 lines on failure
+        if: failure()
+        run: grep -E "error:|Error|FAILED|Exception" build.log | head -40 || tail -80 build.log
 
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: LivingWeather-debug
