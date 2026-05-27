@@ -2,10 +2,8 @@ package com.studiosmus.livingweather
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.Matrix
 import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
@@ -35,8 +33,11 @@ class LivingWeatherWallpaperService : WallpaperService() {
         private var bgBitmap: Bitmap? = null
         private var weatherData: WeatherData? = null
 
+        // Particle systems
         private var rain: RainSystem? = null
         private var snow: SnowSystem? = null
+        private var fog: FogSystem? = null
+        private var lightning: LightningSystem? = null
 
         private val drawRunnable = object : Runnable {
             override fun run() {
@@ -46,7 +47,6 @@ class LivingWeatherWallpaperService : WallpaperService() {
                 lastFrameMs = start
                 drawFrame(dt)
                 if (visible) {
-                    // Schedule next frame accounting for render time → smooth 60fps
                     val renderMs = System.currentTimeMillis() - start
                     handler.postDelayed(this, (FRAME_MS - renderMs).coerceAtLeast(0))
                 }
@@ -65,15 +65,13 @@ class LivingWeatherWallpaperService : WallpaperService() {
         }
 
         override fun onSurfaceCreated(holder: SurfaceHolder) {
-            loadBackground()
+            reloadBackground()
         }
 
         override fun onSurfaceChanged(holder: SurfaceHolder, format: Int, w: Int, h: Int) {
-            surfaceW = w
-            surfaceH = h
-            loadBackground()
-            rain = RainSystem(w, h)
-            snow = SnowSystem(w, h)
+            surfaceW = w; surfaceH = h
+            reloadBackground()
+            initParticles()
         }
 
         override fun onSurfaceDestroyed(holder: SurfaceHolder) {
@@ -86,11 +84,18 @@ class LivingWeatherWallpaperService : WallpaperService() {
             scope.cancel()
         }
 
-        private fun loadBackground() {
-            val prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            val path = prefs.getString(KEY_BG, null) ?: return
-            val raw = BitmapFactory.decodeFile(path) ?: return
-            bgBitmap = scaleCrop(raw, surfaceW, surfaceH)
+        private fun reloadBackground() {
+            val path = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getString(KEY_BG, null) ?: return
+            bgBitmap = WeatherRenderer.loadBackground(path, surfaceW, surfaceH)
+        }
+
+        private fun initParticles() {
+            val w = surfaceW; val h = surfaceH
+            rain = RainSystem(w, h)
+            snow = SnowSystem(w, h)
+            fog = FogSystem(w, h)
+            lightning = LightningSystem(w, h)
         }
 
         private fun fetchWeather() {
@@ -106,7 +111,6 @@ class LivingWeatherWallpaperService : WallpaperService() {
             val holder = surfaceHolder
             var canvas: Canvas? = null
             try {
-                // Hardware canvas (GPU) on API 26+ for smooth rendering
                 canvas = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
                     holder.lockHardwareCanvas() else holder.lockCanvas()
                 canvas ?: return
@@ -117,17 +121,19 @@ class LivingWeatherWallpaperService : WallpaperService() {
         }
 
         private fun renderFrame(canvas: Canvas, dt: Float) {
-            val w = surfaceW
-            val h = surfaceH
+            val w = surfaceW; val h = surfaceH
             val weather = weatherData
             val condition = weather?.condition ?: WeatherCondition.CLEAR_DAY
             val timeOfDay = weather?.timeOfDay ?: TimeOfDay.AFTERNOON
             val temp = weather?.temperatureCelsius ?: 0.0
 
-            // 1. Background
+            // 1. Background with atmospheric color grading
             val bg = bgBitmap
-            if (bg != null) canvas.drawBitmap(bg, 0f, 0f, null)
-            else canvas.drawColor(Color.rgb(20, 20, 40))
+            if (bg != null) {
+                WeatherRenderer.drawBackground(canvas, null, condition, w, h, preloaded = bg)
+            } else {
+                canvas.drawColor(Color.rgb(20, 20, 40))
+            }
 
             // 2. Time-of-day overlay
             ParticleSystem.drawTimeOverlay(canvas, timeOfDay, w, h)
@@ -135,56 +141,40 @@ class LivingWeatherWallpaperService : WallpaperService() {
             // 3. Animated weather effects
             when (condition) {
                 WeatherCondition.DRIZZLE -> {
-                    rain?.update(dt, 0.75f); rain?.draw(canvas, 0.4f)
+                    rain?.update(dt, 0.6f); rain?.draw(canvas, 0.35f)
                 }
                 WeatherCondition.RAIN -> {
                     rain?.update(dt); rain?.draw(canvas, 0.75f)
                 }
                 WeatherCondition.HEAVY_RAIN -> {
-                    ParticleSystem.drawDarkOverlay(canvas, w, h, 80)
-                    rain?.update(dt, 1.5f); rain?.draw(canvas, 1.0f)
+                    rain?.update(dt, 1.4f); rain?.draw(canvas, 1.0f)
                 }
                 WeatherCondition.SNOW -> {
-                    snow?.update(dt); snow?.draw(canvas, 0.6f)
+                    snow?.update(dt); snow?.draw(canvas, 0.65f)
                 }
                 WeatherCondition.HEAVY_SNOW -> {
-                    ParticleSystem.drawWhiteHaze(canvas, w, h, 45)
+                    ParticleSystem.drawWhiteHaze(canvas, w, h, 40)
                     snow?.update(dt); snow?.draw(canvas, 1.0f)
                 }
                 WeatherCondition.THUNDERSTORM -> {
-                    ParticleSystem.drawDarkOverlay(canvas, w, h, 100)
-                    rain?.update(dt, 2f); rain?.draw(canvas, 1.0f)
-                    // lightning flash ~every 5 seconds
-                    if (System.currentTimeMillis() % 5000 < 80) {
-                        canvas.drawColor(Color.argb(55, 255, 255, 190))
-                    }
+                    rain?.update(dt, 1.8f); rain?.draw(canvas, 1.0f)
+                    lightning?.let { if (it.maybeStrike()) Unit; it.draw(canvas) }
                 }
-                WeatherCondition.FOG -> ParticleSystem.drawFog(canvas, w, h)
-                WeatherCondition.OVERCAST -> ParticleSystem.drawDarkOverlay(canvas, w, h, 55)
+                WeatherCondition.FOG -> {
+                    fog?.update(dt); fog?.draw(canvas, 1.0f)
+                }
+                WeatherCondition.OVERCAST -> {}
                 WeatherCondition.PARTLY_CLOUDY_DAY,
-                WeatherCondition.PARTLY_CLOUDY_NIGHT -> ParticleSystem.drawDarkOverlay(canvas, w, h, 22)
+                WeatherCondition.PARTLY_CLOUDY_NIGHT -> {}
                 WeatherCondition.CLEAR_DAY -> ParticleSystem.drawSunGlow(canvas, w, h)
                 WeatherCondition.CLEAR_NIGHT ->
                     ParticleSystem.drawNightOverlay(canvas, w, h, System.currentTimeMillis() / 3_600_000)
             }
 
-            // 4. Temperature + condition text
+            // 4. Info overlay
             if (weather != null) {
                 ParticleSystem.drawInfoOverlay(canvas, temp, condition, w, h)
             }
-        }
-
-        private fun scaleCrop(src: Bitmap, tw: Int, th: Int): Bitmap {
-            val srcR = src.width.toFloat() / src.height
-            val dstR = tw.toFloat() / th
-            val (sw, sh) = if (srcR > dstR) Pair((th * srcR).toInt(), th)
-                           else Pair(tw, (tw / srcR).toInt())
-            val m = Matrix()
-            m.setScale(sw.toFloat() / src.width, sh.toFloat() / src.height)
-            val scaled = Bitmap.createBitmap(src, 0, 0, src.width, src.height, m, true)
-            val ox = ((sw - tw) / 2).coerceAtLeast(0)
-            val oy = ((sh - th) / 2).coerceAtLeast(0)
-            return Bitmap.createBitmap(scaled, ox, oy, tw, th)
         }
     }
 
@@ -192,6 +182,6 @@ class LivingWeatherWallpaperService : WallpaperService() {
         const val PREFS = "LivingWeatherPrefs"
         const val KEY_BG = "live_bg"
         const val WEATHER_ID = -1
-        private const val FRAME_MS = 16L // target 60 fps
+        private const val FRAME_MS = 16L
     }
 }

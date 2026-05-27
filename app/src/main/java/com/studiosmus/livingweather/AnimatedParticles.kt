@@ -3,71 +3,219 @@ package com.studiosmus.livingweather
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.random.Random
 
+// ─── Rain: 3 depth layers ────────────────────────────────────────────────────
+
 class RainSystem(private val w: Int, private val h: Int) {
-    private val count = (w * 0.5f).toInt().coerceIn(100, 600)
-    private val x = FloatArray(count) { Random.nextFloat() * (w + 120f) - 60f }
-    private val y = FloatArray(count) { Random.nextFloat() * h }
-    private val speed = FloatArray(count) { Random.nextFloat() * 900f + 700f }  // 700–1600 px/s
-    private val len = FloatArray(count) { Random.nextFloat() * 50f + 22f }       // 22–72 px
 
-    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = 1.8f }
-    private val sinA = sin(Math.toRadians(22.0)).toFloat()
-    private val cosA = cos(Math.toRadians(22.0)).toFloat()
+    private inner class Layer(
+        count: Int,
+        speedMin: Float, speedMax: Float,
+        lenMin: Float, lenMax: Float,
+        val stroke: Float,
+        val alphaMin: Int, val alphaMax: Int
+    ) {
+        val x = FloatArray(count) { Random.nextFloat() * (w + 120f) - 60f }
+        val y = FloatArray(count) { Random.nextFloat() * h }
+        val speed = FloatArray(count) { Random.nextFloat() * (speedMax - speedMin) + speedMin }
+        val len = FloatArray(count) { Random.nextFloat() * (lenMax - lenMin) + lenMin }
+        val count = count
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = stroke }
 
-    fun update(dt: Float, speedMult: Float = 1f) {
-        for (i in 0 until count) {
-            val s = speed[i] * dt * speedMult
-            y[i] += s * cosA
-            x[i] += s * sinA
-            if (y[i] > h + len[i]) {
-                y[i] = -len[i] - Random.nextFloat() * 40f
-                x[i] = Random.nextFloat() * (w + 80f) - 40f
+        fun update(dt: Float, mult: Float) {
+            for (i in 0 until count) {
+                y[i] += speed[i] * dt * mult * cosA
+                x[i] += speed[i] * dt * mult * sinA
+                if (y[i] > h + len[i]) {
+                    y[i] = -len[i] - Random.nextFloat() * 60f
+                    x[i] = Random.nextFloat() * (w + 100f) - 50f
+                }
+            }
+        }
+
+        fun draw(canvas: Canvas, intensity: Float) {
+            val n = (count * intensity).toInt()
+            for (i in 0 until n) {
+                val alpha = alphaMin + ((y[i] * 0.04f).toInt() and (alphaMax - alphaMin))
+                paint.color = Color.argb(alpha.coerceIn(alphaMin, alphaMax), 190, 220, 255)
+                canvas.drawLine(x[i], y[i], x[i] + len[i] * sinA, y[i] + len[i] * cosA, paint)
             }
         }
     }
 
+    private val sinA = sin(Math.toRadians(20.0)).toFloat()
+    private val cosA = cos(Math.toRadians(20.0)).toFloat()
+
+    // background: small, slow, transparent
+    private val far = Layer(w / 6, 300f, 500f, 8f, 16f, 1.0f, 40, 80)
+    // mid: medium
+    private val mid = Layer(w / 4, 600f, 900f, 22f, 42f, 1.6f, 100, 155)
+    // foreground: long, fast, opaque
+    private val near = Layer(w / 5, 1000f, 1600f, 45f, 80f, 2.2f, 160, 220)
+
+    fun update(dt: Float, speedMult: Float = 1f) {
+        far.update(dt, speedMult * 0.35f)
+        mid.update(dt, speedMult * 0.65f)
+        near.update(dt, speedMult)
+    }
+
     fun draw(canvas: Canvas, intensity: Float) {
-        val n = (count * intensity).toInt()
-        for (i in 0 until n) {
-            val alpha = (140 + ((y[i] * 0.05f).toInt() and 0x3F)).coerceIn(140, 210)
-            paint.color = Color.argb(alpha, 170, 215, 245)
-            canvas.drawLine(x[i], y[i], x[i] + len[i] * sinA, y[i] + len[i] * cosA, paint)
+        far.draw(canvas, intensity)
+        mid.draw(canvas, intensity)
+        near.draw(canvas, (intensity * 0.75f))
+    }
+}
+
+// ─── Snow: 3 depth layers ────────────────────────────────────────────────────
+
+class SnowSystem(private val w: Int, private val h: Int) {
+
+    private inner class SnowLayer(
+        count: Int,
+        speedMin: Float, speedMax: Float,
+        rMin: Float, rMax: Float,
+        val alphaMin: Int, val alphaMax: Int,
+        val swayScale: Float
+    ) {
+        val x = FloatArray(count) { Random.nextFloat() * w }
+        val y = FloatArray(count) { Random.nextFloat() * h }
+        val speed = FloatArray(count) { Random.nextFloat() * (speedMax - speedMin) + speedMin }
+        val radius = FloatArray(count) { Random.nextFloat() * (rMax - rMin) + rMin }
+        val phase = FloatArray(count) { Random.nextFloat() * 6.28f }
+        val count = count
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+        fun update(dt: Float, time: Float) {
+            for (i in 0 until count) {
+                y[i] += speed[i] * dt
+                x[i] += sin(time * 0.6f + phase[i]).toFloat() * swayScale * dt
+                if (y[i] > h + radius[i]) {
+                    y[i] = -radius[i]
+                    x[i] = Random.nextFloat() * w
+                }
+            }
+        }
+
+        fun draw(canvas: Canvas, intensity: Float) {
+            val n = (count * intensity).toInt()
+            for (i in 0 until n) {
+                val alpha = (alphaMin + ((y[i] * 0.03f).toInt() and (alphaMax - alphaMin)))
+                    .coerceIn(alphaMin, alphaMax)
+                paint.color = Color.argb(alpha, 240, 245, 255)
+                canvas.drawCircle(x[i], y[i], radius[i], paint)
+            }
+        }
+    }
+
+    private var time = 0f
+    private val far = SnowLayer(w * h / 40000, 25f, 50f, 1f, 2.5f, 50, 100, 8f)
+    private val mid = SnowLayer(w * h / 20000, 45f, 80f, 2f, 4f, 110, 175, 14f)
+    private val near = SnowLayer(w * h / 30000, 70f, 120f, 4f, 7f, 160, 230, 20f)
+
+    fun update(dt: Float) {
+        time += dt
+        far.update(dt, time)
+        mid.update(dt, time)
+        near.update(dt, time)
+    }
+
+    fun draw(canvas: Canvas, intensity: Float) {
+        far.draw(canvas, intensity)
+        mid.draw(canvas, intensity)
+        near.draw(canvas, intensity * 0.6f)
+    }
+}
+
+// ─── Fog: animated drifting layers ───────────────────────────────────────────
+
+class FogSystem(private val w: Int, private val h: Int) {
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private var time = 0f
+
+    fun update(dt: Float) { time += dt * 0.08f }
+
+    fun draw(canvas: Canvas, density: Float) {
+        // 3 fog bands drifting at slightly different speeds
+        for (i in 0..2) {
+            val offset = (time * (0.4f + i * 0.15f) * w) % w
+            val yFrac = 0.2f + i * 0.25f
+            val alpha = (density * (55 + i * 20)).toInt().coerceIn(20, 120)
+            paint.color = Color.argb(alpha, 210, 215, 225)
+
+            // draw band wrapping around
+            canvas.drawRect(offset - w, h * yFrac, offset, h * (yFrac + 0.35f), paint)
+            canvas.drawRect(offset, h * yFrac, offset + w, h * (yFrac + 0.35f), paint)
         }
     }
 }
 
-class SnowSystem(private val w: Int, private val h: Int) {
-    private val count = (w * h / 3000).coerceIn(50, 350)
-    private val x = FloatArray(count) { Random.nextFloat() * w }
-    private val y = FloatArray(count) { Random.nextFloat() * h }
-    private val speed = FloatArray(count) { Random.nextFloat() * 90f + 50f }
-    private val radius = FloatArray(count) { Random.nextFloat() * 5f + 1.5f }
-    private val sway = FloatArray(count) { (Random.nextFloat() - 0.5f) * 22f }
-    private var time = 0f
-    private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+// ─── Lightning with branching glow ───────────────────────────────────────────
 
-    fun update(dt: Float) {
-        time += dt
-        for (i in 0 until count) {
-            y[i] += speed[i] * dt
-            x[i] += sin(time * 0.7f + i * 0.4f).toFloat() * sway[i] * dt
-            if (y[i] > h + radius[i]) {
-                y[i] = -radius[i]
-                x[i] = Random.nextFloat() * w
-            }
+class LightningSystem(private val w: Int, private val h: Int) {
+    private val boltPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = 3f }
+    private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = 12f }
+    private var lastBoltTime = 0L
+    private var boltSeed = 0L
+
+    fun maybeStrike(): Boolean {
+        val now = System.currentTimeMillis()
+        if (now - lastBoltTime > Random.nextLong(3000, 8000)) {
+            lastBoltTime = now
+            boltSeed = now
+            return true
         }
+        return false
     }
 
-    fun draw(canvas: Canvas, intensity: Float) {
-        val n = (count * intensity).toInt()
-        for (i in 0 until n) {
-            val alpha = (130 + ((y[i] * 0.04f).toInt() and 0x5F)).coerceIn(130, 230)
-            paint.color = Color.argb(alpha, 255, 255, 255)
-            canvas.drawCircle(x[i], y[i], radius[i], paint)
+    fun draw(canvas: Canvas) {
+        val now = System.currentTimeMillis()
+        val age = now - lastBoltTime
+        if (age > 300) return // bolt visible for 300ms
+
+        val alpha = (1f - age / 300f).coerceIn(0f, 1f)
+
+        // Flash the whole screen
+        canvas.drawColor(Color.argb((40 * alpha).toInt(), 255, 255, 210))
+
+        val rng = Random(boltSeed)
+        drawBolt(canvas, rng, alpha,
+            w * (0.2f + rng.nextFloat() * 0.6f), 0f,
+            w * (0.3f + rng.nextFloat() * 0.4f), h * 0.6f,
+            4)
+    }
+
+    private fun drawBolt(
+        canvas: Canvas, rng: Random, alpha: Float,
+        x1: Float, y1: Float, x2: Float, y2: Float,
+        depth: Int
+    ) {
+        if (depth == 0) return
+        val mx = (x1 + x2) / 2f + (rng.nextFloat() - 0.5f) * 80f
+        val my = (y1 + y2) / 2f + (rng.nextFloat() - 0.5f) * 20f
+
+        glowPaint.color = Color.argb((30 * alpha).toInt(), 200, 220, 255)
+        canvas.drawLine(x1, y1, mx, my, glowPaint)
+        canvas.drawLine(mx, my, x2, y2, glowPaint)
+
+        boltPaint.color = Color.argb((220 * alpha).toInt(), 255, 255, 200)
+        canvas.drawLine(x1, y1, mx, my, boltPaint)
+        canvas.drawLine(mx, my, x2, y2, boltPaint)
+
+        drawBolt(canvas, rng, alpha, x1, y1, mx, my, depth - 1)
+        drawBolt(canvas, rng, alpha, mx, my, x2, y2, depth - 1)
+
+        // occasional branch
+        if (rng.nextFloat() > 0.55f && depth > 1) {
+            val bx = mx + (rng.nextFloat() - 0.3f) * 120f
+            val by = my + rng.nextFloat() * 150f
+            boltPaint.color = Color.argb((120 * alpha).toInt(), 255, 255, 200)
+            boltPaint.strokeWidth = 1.5f
+            canvas.drawLine(mx, my, bx, by, boltPaint)
+            boltPaint.strokeWidth = 3f
         }
     }
 }
