@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Pump Manual Compiler v2 — MAAG Italy</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;1,9..144,300&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+<style>
+:root {
+  --bg-dark: #09090b;
+  --bg-card: rgba(24, 24, 27, 0.6);
+  --border-light: rgba(255, 255, 255, 0.08);
+  --text-primary: #f4f4f5;
+  --text-muted: #a1a1aa;
+  --gold-primary: #d4af37;
+  --gold-glow: rgba(212, 175, 55, 0.3);
+  --accent-blue: #38bdf8;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: var(--bg-dark);
+  color: var(--text-primary);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow-x: hidden;
+}
+.bg-orb-1 {
+  position: fixed; top: -10%; left: -10%; width: 50vw; height: 50vw;
+  background: radial-gradient(circle, var(--gold-glow) 0%, transparent 70%);
+  filter: blur(80px); z-index: -1; opacity: 0.6; pointer-events: none;
+}
+.bg-orb-2 {
+  position: fixed; bottom: -20%; right: -10%; width: 60vw; height: 60vw;
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.15) 0%, transparent 70%);
+  filter: blur(100px); z-index: -1; opacity: 0.5; pointer-events: none;
+}
+.header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 20px 40px;
+  background: rgba(9, 9, 11, 0.8);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-light);
+  position: sticky; top: 0; z-index: 50;
+}
+.brand { font-family: 'Fraunces', serif; font-size: 24px; font-weight: 600; color: var(--gold-primary); letter-spacing: 1px; }
+.header-title { font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 500; letter-spacing: 2px; text-transform: uppercase; color: var(--text-muted); }
+.clock { font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 500; color: var(--text-muted); }
+.container {
+  max-width: 1200px; margin: 24px auto; padding: 0 20px 80px;
+  display: grid; grid-template-columns: 1fr 1.3fr; gap: 30px; align-items: start;
+  flex: 1;
+}
+.left-col { display: flex; flex-direction: column; gap: 20px; position: sticky; top: 100px; }
+.hero-card {
+  background: var(--bg-card); border: 1px solid var(--border-light);
+  border-radius: 24px; padding: 36px; backdrop-filter: blur(20px);
+  box-shadow: 0 24px 40px rgba(0,0,0,0.4);
+}
+.badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: rgba(212, 175, 55, 0.1); border: 1px solid rgba(212, 175, 55, 0.2);
+  color: var(--gold-primary); padding: 6px 14px; border-radius: 20px;
+  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;
+  margin-bottom: 20px;
+}
+.hero-card h1 { font-family: 'Outfit', sans-serif; font-size: 32px; font-weight: 300; line-height: 1.15; margin-bottom: 16px; }
+.hero-card h1 strong { font-weight: 700; background: linear-gradient(90deg, var(--gold-primary), #fff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.hero-card p { color: var(--text-muted); font-size: 13px; line-height: 1.7; font-weight: 300; }
+.feature-list { list-style: none; margin-top: 16px; display: flex; flex-direction: column; gap: 9px; }
+.feature-list li { display: flex; align-items: flex-start; gap: 10px; font-size: 12.5px; color: #d4d4d8; line-height: 1.5; }
+.feature-list li::before { content: '▸'; color: var(--gold-primary); font-size: 11px; margin-top: 3px; flex-shrink: 0; }
+.fstatus {
+  background: var(--bg-card); border: 1px solid var(--border-light);
+  border-radius: 20px; padding: 22px; backdrop-filter: blur(20px);
+  display: flex; align-items: flex-start; gap: 16px;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.fstatus.wait { border-left: 4px solid var(--text-muted); }
+.fstatus.ok { border-left: 4px solid #10b981; background: rgba(16, 185, 129, 0.05); }
+.fstatus.err { border-left: 4px solid #ef4444; background: rgba(239, 68, 68, 0.05); }
+.fstatus.loading { border-left: 4px solid #f59e0b; background: rgba(245, 158, 11, 0.05); }
+.fsc-ico { font-size: 28px; filter: drop-shadow(0 4px 12px rgba(0,0,0,0.5)); flex-shrink: 0; padding-top: 2px; }
+.fsc-text { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.fsc-name { font-family: 'Outfit', sans-serif; font-size: 15px; font-weight: 600; color: #fff; }
+.fsc-info { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+.section-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.stag {
+  font-size: 10px; font-weight: 600; padding: 3px 9px; border-radius: 10px;
+  font-family: 'Outfit', sans-serif; letter-spacing: 0.5px;
+}
+.stag.found { background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #10b981; }
+.stag.missing { background: rgba(161, 161, 170, 0.1); border: 1px solid rgba(161, 161, 170, 0.2); color: var(--text-muted); }
+.stag.has-files { background: rgba(212, 175, 55, 0.15); border: 1px solid rgba(212, 175, 55, 0.3); color: var(--gold-primary); }
+.config-panel {
+  background: var(--bg-card); border: 1px solid var(--border-light);
+  border-radius: 24px; padding: 24px 28px; backdrop-filter: blur(20px);
+  box-shadow: 0 24px 40px rgba(0,0,0,0.4);
+  display: flex; flex-direction: column; gap: 16px;
+}
+.config-panel h2 {
+  font-family: 'Outfit', sans-serif; font-size: 20px; font-weight: 600;
+  color: #fff; margin-bottom: 4px; display: flex; align-items: center; gap: 12px;
+}
+.config-panel h2::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, var(--border-light), transparent); }
+.section-divider {
+  height: 1px; background: var(--border-light); margin: 4px 0;
+}
+.dati-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 0; cursor: pointer; user-select: none;
+  font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 600; color: #d4d4d8;
+  border-bottom: 1px solid var(--border-light);
+}
+.dati-header:hover { color: var(--gold-primary); }
+.dati-arrow { font-size: 10px; transition: transform 0.25s; }
+.dati-body { padding-top: 10px; display: none; flex-direction: column; gap: 0; }
+.dati-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.dati-field { display: flex; flex-direction: column; gap: 4px; }
+.dati-field.full { grid-column: 1 / -1; }
+.dati-field label { font-size: 10.5px; color: var(--text-muted); font-weight: 500; }
+.dati-field input[type="text"],
+.dati-field input[type="date"] {
+  padding: 7px 10px;
+  background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px; color: var(--text-primary); font-size: 12px;
+  font-family: 'Inter', sans-serif; width: 100%;
+  transition: border-color 0.2s;
+}
+.dati-field input:focus { outline: none; border-color: var(--gold-primary); }
+.form-group { display: flex; flex-direction: column; gap: 7px; }
+.form-label {
+  font-size: 12px; font-weight: 500; color: #e4e4e7;
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 8px;
+}
+.form-label .lbl-main { flex: 1; }
+.form-label .lbl-badge {
+  font-size: 10px; color: var(--gold-primary); font-weight: 600;
+  background: rgba(212, 175, 55, 0.1); padding: 2px 8px; border-radius: 10px;
+  white-space: nowrap; flex-shrink: 0;
+}
+.form-label .lbl-required {
+  font-size: 10px; color: #ef4444; font-weight: 600;
+  background: rgba(239, 68, 68, 0.1); padding: 2px 8px; border-radius: 10px;
+  flex-shrink: 0;
+}
+input[type="file"] {
+  width: 100%; padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.3); border: 1px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 12px; color: var(--text-muted); font-size: 12px;
+  transition: all 0.2s; cursor: pointer;
+}
+input[type="file"]:hover { border-color: var(--gold-primary); background: rgba(212, 175, 55, 0.02); }
+input[type="file"]::-webkit-file-upload-button {
+  background: #fff; color: #000; border: none;
+  padding: 6px 14px; border-radius: 8px; font-family: 'Outfit', sans-serif;
+  font-size: 11px; font-weight: 600; cursor: pointer; margin-right: 14px;
+  transition: all 0.2s;
+}
+input[type="file"]::-webkit-file-upload-button:hover { background: #e4e4e7; }
+.footer-options {
+  background: rgba(0,0,0,0.2); border-radius: 14px; padding: 14px 16px;
+  border: 1px solid var(--border-light); display: flex; flex-direction: column; gap: 10px;
+}
+.footer-options label {
+  font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 8px; cursor: pointer;
+}
+.footer-options input[type="checkbox"] { width: 14px; height: 14px; accent-color: var(--gold-primary); cursor: pointer; }
+.footer-options input[type="number"] {
+  width: 70px; padding: 4px 8px; background: rgba(0,0,0,0.4);
+  border: 1px solid rgba(255,255,255,0.15); border-radius: 8px;
+  color: var(--text-primary); font-size: 12px; text-align: center;
+}
+.opt-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ut-btn {
+  padding: 15px;
+  background: linear-gradient(135deg, var(--gold-primary), #bfa43a);
+  color: #000; border: none; border-radius: 16px;
+  font-family: 'Outfit', sans-serif; font-size: 15px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 1px;
+  cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 8px 24px rgba(212, 175, 55, 0.3);
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  width: 100%;
+}
+.ut-btn:hover { transform: translateY(-3px); box-shadow: 0 12px 32px rgba(212, 175, 55, 0.4); filter: brightness(1.1); }
+.ut-btn:active { transform: translateY(0); }
+.ut-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.footer {
+  position: fixed; bottom: 0; left: 0; right: 0; height: 44px;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(90deg, #bfa43a 0%, #e6c84f 50%, #f5df87 100%);
+  color: #1b1400; font-size: 11px; z-index: 100;
+  box-shadow: 0 -4px 20px rgba(0,0,0,.3); gap: 5px;
+  font-family: 'Inter', sans-serif;
+}
+.footer strong { font-weight: 700; }
+.footer a { color: #1b1400; text-decoration: none; font-weight: 600; }
+.footer a:hover { text-decoration: underline; }
+#splash-screen {
+  position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+  background: radial-gradient(circle at center, #111 0%, #000 100%);
+  z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  transition: opacity 1s cubic-bezier(0.8, 0, 0.2, 1), transform 1s cubic-bezier(0.8, 0, 0.2, 1), visibility 1s;
+}
+#splash-screen.hidden { opacity: 0; transform: scale(1.08); visibility: hidden; pointer-events: none; }
+.splash-container { display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
+.splash-text { font-family: 'Fraunces', serif; font-size: 64px; font-weight: 600; color: #fff; letter-spacing: 12px; text-transform: uppercase; margin-left: 12px; opacity: 0; animation: maagReveal 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+.splash-line { width: 0; height: 1px; background: linear-gradient(90deg, transparent, var(--gold-primary), transparent); margin: 10px 0 15px; animation: lineSweep 1.2s cubic-bezier(0.8, 0, 0.2, 1) 0.4s forwards; }
+.splash-sub { font-family: 'Outfit', sans-serif; font-size: 16px; font-weight: 300; color: var(--gold-primary); letter-spacing: 14px; margin-left: 14px; text-transform: uppercase; opacity: 0; clip-path: inset(0 100% 0 0); animation: subReveal 1.2s cubic-bezier(0.8, 0, 0.2, 1) 0.8s forwards; }
+.splash-glow { position: absolute; width: 500px; height: 500px; background: radial-gradient(circle, rgba(212, 175, 55, 0.1) 0%, transparent 60%); filter: blur(50px); z-index: -1; animation: glowPulse 3s ease-in-out infinite alternate; }
+@keyframes maagReveal { 0% { opacity: 0; transform: scale(1.2) translateY(20px); filter: blur(10px); } 100% { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); } }
+@keyframes lineSweep { 0% { width: 0; opacity: 0; } 100% { width: 400px; opacity: 1; } }
+@keyframes subReveal { 0% { opacity: 0; clip-path: inset(0 100% 0 0); } 100% { opacity: 1; clip-path: inset(0 0 0 0); } }
+@keyframes glowPulse { 0% { transform: scale(0.8); opacity: 0.3; } 100% { transform: scale(1.2); opacity: 0.8; } }
+@media (max-width: 900px) { .container { grid-template-columns: 1fr; } .left-col { position: static; } }
+.cs-item {
+  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px; padding: 12px; margin-bottom: 10px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.cs-item input[type="text"], .cs-item select {
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px; padding: 8px 12px; color: var(--text-primary);
+  font-family: 'Inter', sans-serif; font-size: 13px; width: 100%;
+}
+.cs-item input[type="file"] { color: var(--text-muted); font-size: 12px; }
+.cs-remove { align-self: flex-end; padding: 4px 12px; background: rgba(239,68,68,0.15);
+  border: 1px solid rgba(239,68,68,0.3); border-radius: 8px; color: #f87171;
+  font-size: 12px; cursor: pointer; font-family: 'Inter', sans-serif; }
+</style>
+</head>
+<body>
+
+<div id="splash-screen">
+  <div class="splash-glow"></div>
+  <div class="splash-container">
+    <div class="splash-text">MAAG</div>
+    <div class="splash-line"></div>
+    <div class="splash-sub">Quality Assurance</div>
+  </div>
+</div>
+
+<div class="bg-orb-1"></div>
+<div class="bg-orb-2"></div>
+
+<header class="header">
+  <div class="brand">MAAG ITALY</div>
+  <div class="header-title">Advanced Document Engineering</div>
+  <div class="clock" id="clock">—</div>
+</header>
+
+<main class="container">
+
+  <div class="left-col">
+    <div class="hero-card">
+      <div class="badge">▸ QC Core Engine v2 — MAAG</div>
+      <h1>Compilazione Manuale<br><strong>Intelligente</strong></h1>
+      <p>Carica il template base con le pagine bianche e i documenti tecnici da inserire. Il motore rileva automaticamente i capitoli, inietta i contenuti, aggiorna la numerazione pagine e l'indice.</p>
+      <ul class="feature-list">
+        <li>Rilevamento automatico dei capitoli 14.7 – 14.10 nel template</li>
+        <li>Inserimento allegati mantenendo intestazione e piè di pagina MAAG</li>
+        <li>Ricalcolo sequenziale della numerazione da 14.7 in poi</li>
+        <li>Aggiornamento automatico dell'indice con le nuove pagine</li>
+        <li>Supporto multi-file per ogni sezione — impilati in ordine</li>
+      </ul>
+    </div>
+
+    <div class="fstatus wait" id="statusBar">
+      <div class="fsc-ico" id="statusIcon">⚡</div>
+      <div class="fsc-text">
+        <span class="fsc-name" id="statusTitle">In attesa di input</span>
+        <span class="fsc-info" id="statusInfo">Carica il template PDF e i documenti da inserire.</span>
+        <div class="section-tags" id="sectionTags"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="config-panel">
+    <h2>Pannello di Configurazione</h2>
+
+    <div class="form-group">
+      <div class="form-label">
+        <span class="lbl-main">1 · Template Manuale Base (PDF)</span>
+        <span class="lbl-required">OBBLIGATORIO</span>
+      </div>
+      <input type="file" id="manuale_base" accept=".pdf" onchange="onTemplateSelected(this)">
+    </div>
+
+    <!-- ── DATI IDENTIFICATIVI ── -->
+    <div>
+      <div class="dati-header" onclick="toggleDati(this)">
+        <span>📋 Dati Identificativi Manuale</span>
+        <span class="dati-arrow">▼</span>
+      </div>
+      <div class="dati-body" id="datiBody">
+        <div style="height:10px"></div>
+        <div class="dati-grid">
+          <div class="dati-field full"><label>Costruttore / Manufacturer</label><input type="text" id="d_costruttore" placeholder="es. MAAG Pump Systems AG"></div>
+          <div class="dati-field full"><label>Indirizzo / Address</label><input type="text" id="d_addr1" placeholder="Via / Str. / Address line 1"></div>
+          <div class="dati-field full"><label>Indirizzo (riga 2) / Address line 2</label><input type="text" id="d_addr2" placeholder="CAP, Città / ZIP, City, Country"></div>
+          <div class="dati-field"><label>N° ordine produttore</label><input type="text" id="d_ordine_prod"></div>
+          <div class="dati-field"><label>Tipo di pompa</label><input type="text" id="d_tipo_pompa"></div>
+          <div class="dati-field full"><label>Data consegna manuale</label><input type="date" id="d_data_consegna"></div>
+          <div class="dati-field full"><label>Cliente</label><input type="text" id="d_cliente"></div>
+          <div class="dati-field"><label>N° ordine cliente</label><input type="text" id="d_ordine_cliente"></div>
+          <div class="dati-field"><label>Utente</label><input type="text" id="d_utente"></div>
+          <div class="dati-field full"><label>Luogo di installazione</label><input type="text" id="d_luogo"></div>
+          <div class="dati-field"><label>Paese</label><input type="text" id="d_paese"></div>
+          <div class="dati-field"><label>Numero TAG</label><input type="text" id="d_tag"></div>
+          <div class="dati-field full"><label>Linea</label><input type="text" id="d_linea"></div>
+        </div>
+        <div style="height:8px"></div>
+      </div>
+    </div>
+
+    <div class="section-divider"></div>
+
+    <div class="form-group">
+      <div class="form-label">
+        <span class="lbl-main">2 · Cap 14.7 — Data Sheet</span>
+        <span class="lbl-badge">PIÙ FILE</span>
+      </div>
+      <input type="file" id="pdf_14_7" accept=".pdf" multiple>
+    </div>
+
+    <div class="form-group">
+      <div class="form-label">
+        <span class="lbl-main">3 · Cap 14.8 — Drawings / Disegni</span>
+        <span class="lbl-badge">PIÙ FILE</span>
+      </div>
+      <input type="file" id="pdf_14_8" accept=".pdf" multiple>
+    </div>
+
+    <div class="form-group">
+      <div class="form-label">
+        <span class="lbl-main">4 · Cap 14.9 — Parts Lists / Distinte</span>
+        <span class="lbl-badge">PIÙ FILE</span>
+      </div>
+      <input type="file" id="pdf_14_9" accept=".pdf" multiple>
+    </div>
+
+    <div class="form-group">
+      <div class="form-label">
+        <span class="lbl-main">5 · Cap 14.10 — CE Declaration</span>
+        <span class="lbl-badge">PIÙ FILE</span>
+      </div>
+      <input type="file" id="pdf_14_10" accept=".pdf" multiple>
+    </div>
+
+    <div class="section-divider"></div>
+
+    <!-- ── SEZIONI PERSONALIZZATE ── -->
+    <div class="form-group">
+      <div class="form-label">
+        <span class="lbl-main">Sezioni Personalizzate</span>
+        <span class="lbl-badge">OPZIONALE</span>
+      </div>
+      <p style="font-size:12px;color:var(--text-muted);margin:0 0 10px;">Aggiungi pagine extra (report test, certificati aggiuntivi…) in qualsiasi posizione. Header e footer MAAG mantenuti, numerazione e indice aggiornati automaticamente.</p>
+      <div id="customSectionsList"></div>
+      <button type="button" onclick="addCustomSection()" style="margin-top:8px;padding:9px 16px;background:rgba(212,175,55,0.12);border:1px solid rgba(212,175,55,0.4);border-radius:10px;color:var(--gold-primary);font-family:'Outfit',sans-serif;font-size:13px;font-weight:600;cursor:pointer;width:100%;letter-spacing:0.5px;">＋ Aggiungi sezione personalizzata</button>
+    </div>
+
+    <button class="ut-btn" id="mainBtn" onclick="avviaCompilazione()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+      Avvia Compilazione Intelligente
+    </button>
+
+    <a id="openPdfBtn" href="#" download
+       style="display:none; align-items:center; justify-content:center; gap:10px;
+              padding:13px; border-radius:14px; border:2px solid #10b981;
+              background:rgba(16,185,129,0.1); color:#10b981;
+              font-family:'Outfit',sans-serif; font-size:14px; font-weight:700;
+              text-transform:uppercase; letter-spacing:1px; text-decoration:none;
+              box-shadow:0 6px 20px rgba(16,185,129,0.2); width:100%;">
+      &#8681; Apri / Salva PDF compilato
+    </a>
+  </div>
+
+</main>
+
+<footer class="footer">
+  Realizzato per <strong>MAAG ITALY</strong> da Massimo Preianò &nbsp;|&nbsp; <a href="mailto:massimo.preiano@maag.com">massimo.preiano@maag.com</a>
+</footer>
+
+<script>
+'use strict';
+
+// ─────────────────────────────────────────────
+//  INIT
+// ─────────────────────────────────────────────
+// Rimuove lo splash indipendentemente dal caricamento delle librerie CDN
+setTimeout(() => {
+  const s = document.getElementById('splash-screen');
+  if (s) s.classList.add('hidden');
+}, 2600);
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+const pad = n => String(n).padStart(2, '0');
+function tick() {
+  const d = new Date();
+  document.getElementById('clock').textContent =
+    pad(d.getDate()) + '/' + pad(d.getMonth()+1) + '/' + d.getFullYear() +
+    '  ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+tick(); setInterval(tick, 1000);
+
+const SECTIONS = ['14.7', '14.8', '14.9', '14.10'];
+
+function stato(cls, titolo, info, icona) {
+  document.getElementById('statusBar').className = 'fstatus ' + cls;
+  document.getElementById('statusTitle').textContent = titolo;
+  document.getElementById('statusInfo').textContent = info;
+  if (icona) document.getElementById('statusIcon').textContent = icona;
+}
+
+function leggiBuffer(file) {
+  return new Promise(r => { const fr = new FileReader(); fr.onload = e => r(e.target.result); fr.readAsArrayBuffer(file); });
+}
+
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1,3),16)/255;
+  const g = parseInt(hex.slice(3,5),16)/255;
+  const b = parseInt(hex.slice(5,7),16)/255;
+  return PDFLib.rgb(r, g, b);
+}
+
+// ─────────────────────────────────────────────
+//  ANALISI TEMPLATE (pdf.js)
+// ─────────────────────────────────────────────
+async function analizzaTemplate(buffer) {
+  const pdfjs = await pdfjsLib.getDocument({ data: buffer.slice(0) }).promise;
+  const nPag = pdfjs.numPages;
+  const result = {
+    numPages: nPag,
+    sections: {},
+    tocPageIndices: [],
+    tocEntries: {},
+    footerInfo: null,
+    headerHeight: 55,
+    footerHeight: 45,
+    blankPagesPerSection: {},
+    identPageIndex: 2,
+  };
+  const _bodyContentMap = {}; // pIdx -> bool (ha contenuto nel body)
+
+  // ── scansione pagine ──
+  for (let p = 1; p <= nPag; p++) {
+    const page = await pdfjs.getPage(p);
+    const vp = page.getViewport({ scale: 1.0 });
+    const tc = await page.getTextContent();
+    const items = tc.items;
+    const pIdx = p - 1; // 0-based
+
+    // Rilevamento TOC (prime 20 pagine)
+    if (p <= 20) {
+      const full = items.map(i => i.str.toUpperCase()).join(' ');
+      if (full.includes('INDICE') || full.includes('SOMMARIO') || full.includes('CONTENTS')) {
+        if (!result.tocPageIndices.includes(pIdx)) result.tocPageIndices.push(pIdx);
+      }
+    }
+
+    // Rilevamento capitoli (salta prime 10 pagine per evitare TOC)
+    if (p > 10) {
+      for (const cap of SECTIONS) {
+        if (!result.sections[cap]) {
+          const re = new RegExp(`^${cap.replace('.','\\.')}(\\s|$|\\t|\\.|:|-)`);
+          if (items.some(it => re.test(it.str.trim()))) {
+            result.sections[cap] = { pageIndex: pIdx };
+          }
+        }
+      }
+    }
+
+    // Rileva se la pagina ha contenuto nel body (esclude header top 75pt e footer bottom 55pt)
+    // Soglia 30 caratteri: pagine con solo titolo/numero capitolo ("Annex", "14.7" ecc.) → blank
+    const bodyItems = items.filter(it => it.transform[5] > 55 && it.transform[5] < vp.height - 75 && it.str.trim().length > 0);
+    const bodyCharCount = bodyItems.reduce((n, it) => n + it.str.trim().length, 0);
+    _bodyContentMap[pIdx] = bodyCharCount > 30;
+
+    // Numero pagina nel footer — scansiona TUTTE le pagine post-TOC e prende il numero più a DESTRA in assoluto
+    if (p > (result.tocPageIndices.length > 0 ? result.tocPageIndices[result.tocPageIndices.length-1]+2 : 5)) {
+      let pageBest = null;
+      for (const it of items) {
+        const y = it.transform[5];
+        const x = it.transform[4];
+        const txt = it.str.trim();
+        if (y < 110 && y > 3 && /^\d{1,4}$/.test(txt) && parseInt(txt) > 0) {
+          if (!pageBest || x > pageBest.x) pageBest = { x, y, w: it.width || 0, pageNum: parseInt(txt), foundOnIdx: pIdx, pageHeight: vp.height, pageWidth: vp.width };
+        }
+      }
+      // Mantieni il candidato globalmente più a destra (aggiorna senza stop anticipato)
+      if (pageBest && (!result.footerInfo || pageBest.x > result.footerInfo.x)) {
+        result.footerInfo = pageBest;
+        result.footerHeight = Math.max(35, Math.round(pageBest.y) + 12);
+        // Salva TUTTE le posizioni numeriche nel footer di questa pagina (destra E sinistra)
+        result.footerAllNums = items
+          .filter(it => it.transform[5] < 110 && it.transform[5] > 3 && /^\d{1,4}$/.test(it.str.trim()) && parseInt(it.str.trim()) > 0)
+          .map(it => ({ x: it.transform[4], y: it.transform[5], w: it.width || 0 }));
+      }
+    }
+  }
+
+  // ── pagine disponibili dopo ogni sezione: TUTTE fino alla sezione successiva ──
+  // Non dipende dalla rilevazione testo — garantisce inserimento dalla prima pagina disponibile
+  const allSectionPageIndices = SECTIONS
+    .map(k => result.sections[k]?.pageIndex).filter(i => i !== undefined).sort((a,b) => a-b);
+  for (const cap of SECTIONS) {
+    if (!result.sections[cap]) continue;
+    const titleIdx = result.sections[cap].pageIndex;
+    const nextIdx = allSectionPageIndices.find(i => i > titleIdx) ?? nPag;
+    const blanks = [];
+    for (let bi = titleIdx + 1; bi < nextIdx; bi++) blanks.push(bi);
+    result.blankPagesPerSection[cap] = blanks;
+  }
+
+  // ── TUTTE le pagine vuote del template (da rimuovere se non usate) ──
+  result.allBlankPageIndices = Object.entries(_bodyContentMap)
+    .filter(([, v]) => v === false)
+    .map(([k]) => parseInt(k))
+    .sort((a, b) => a - b);
+
+  // ── rilevamento posizioni campi modulo (prime 10 pagine) ──
+  // Usa keyword matching flessibile: funziona con abbreviazioni, N°, varianti linguistiche
+  const FIELD_MATCHERS = [
+    // Costruttore / Manufacturer
+    { field: "Costruttore",                    test: t => t.startsWith("costruttore") || t.startsWith("manufacturer") || t.startsWith("hersteller") },
+    // N° ordine produttore / Manufacturer's order number
+    { field: "Numero d'ordine del produttore", test: t => (t.includes("produttore") && t.includes("ordine")) || (t.includes("manufacturer") && (t.includes("order") || t.includes("number"))) || t.startsWith("manufacturer's order") },
+    // Tipo pompa / Gear pump / Pump type
+    { field: "Tipo di pompa",                  test: t => (t.startsWith("tipo") && t.length < 20) || t.startsWith("pump type") || t.startsWith("gear pump") || t.startsWith("pompentype") },
+    // Data consegna / Operating manual date of delivery
+    { field: "Data di consegna del manuale",   test: t => (t.startsWith("data") && (t.includes("consegna") || t.includes("delivery"))) || t.startsWith("operating manual date") || (t.includes("manual") && t.includes("delivery")) || t.startsWith("datum") },
+    // Cliente / Customer
+    { field: "Cliente",                        test: t => t === "cliente" || t === "customer" || t === "client" || t === "kunde" },
+    // N° ordine cliente / Customer's purchase number
+    { field: "Numero di ordine cliente",       test: t => (t.includes("ordine") && (t.includes("cliente") || t.includes("acquisto"))) || (t.includes("customer") && (t.includes("purchase") || t.includes("order"))) || t.startsWith("customer's purchase") },
+    // Utente / User
+    { field: "Utente",                         test: t => t === "utente" || t === "user" || t === "benutzer" || t === "utilisateur" },
+    // Luogo installazione / Installation site
+    { field: "Luogo di installazione",         test: t => t.startsWith("luogo") || t.startsWith("installation site") || t.startsWith("installation") || t.startsWith("lieu") },
+    // Paese / Country
+    { field: "Paese",                          test: t => t === "paese" || t === "country" || t === "land" || t === "pays" },
+    // Numero TAG / TAG number
+    { field: "Numero TAG",                     test: t => t === "tag" || t.startsWith("numero tag") || t.startsWith("n° tag") || t.startsWith("tag number") || t.startsWith("n.tag") },
+    // Linea / Line
+    { field: "Linea",                          test: t => t === "linea" || t === "line" || t === "linie" },
+  ];
+  result.campiModulo = {};
+  for (let p = 1; p <= Math.min(10, nPag); p++) {
+    const page = await pdfjs.getPage(p);
+    const tc = await page.getTextContent();
+    for (const it of tc.items) {
+      const tl = it.str.trim().replace(/:$/, '').trim().toLowerCase();
+      if (tl.length < 3) continue;
+      for (const fm of FIELD_MATCHERS) {
+        if (result.campiModulo[fm.field]) continue;
+        if (fm.test(tl)) {
+          result.campiModulo[fm.field] = {
+            pageIndex: p - 1,
+            x: it.transform[4],
+            y: it.transform[5],
+            itemWidth: it.width || 0,
+            detectedText: it.str.trim().replace(/:$/, '').trim(),
+            fontSize: Math.round(Math.abs(it.transform[3])) || 10,
+          };
+          break;
+        }
+      }
+    }
+  }
+
+  // ── pagina identificativa: quella con più campi rilevati ──
+  const pageCounts = {};
+  for (const pos of Object.values(result.campiModulo)) {
+    if (pos) pageCounts[pos.pageIndex] = (pageCounts[pos.pageIndex] || 0) + 1;
+  }
+  const bestIdent = Object.entries(pageCounts).sort((a,b) => b[1]-a[1])[0];
+  if (bestIdent) result.identPageIndex = parseInt(bestIdent[0]);
+
+  // ── rilevamento altezza header dalla prima pagina sezione ──
+  const firstSecKey = SECTIONS.find(k => result.sections[k]);
+  if (firstSecKey) {
+    const pIdx = result.sections[firstSecKey].pageIndex;
+    const page = await pdfjs.getPage(pIdx + 1);
+    const vp = page.getViewport({ scale: 1.0 });
+    const tc = await page.getTextContent();
+    const topItems = tc.items.filter(it => it.transform[5] > vp.height * 0.85);
+    if (topItems.length > 0) {
+      const minY = Math.min(...topItems.map(it => it.transform[5]));
+      result.headerHeight = Math.round(vp.height - minY) + 12;
+    }
+  }
+
+  // ── scansione TOC per voci capitoli ──
+  for (const tocIdx of result.tocPageIndices) {
+    const page = await pdfjs.getPage(tocIdx + 1);
+    const tc = await page.getTextContent();
+    const items = tc.items;
+
+    for (const cap of SECTIONS) {
+      if (result.tocEntries[cap]) continue;
+      const re = new RegExp(`^${cap.replace('.','\\.')}(\\s|$|\\t|\\.|:|-)`);
+      for (const it of items) {
+        if (re.test(it.str.trim())) {
+          const iy = it.transform[5];
+          // Cerca il numero più a destra sulla stessa riga (±6 pt)
+          const numItems = items.filter(o =>
+            o !== it &&
+            Math.abs(o.transform[5] - iy) < 6 &&
+            /^\d{1,4}$/.test(o.str.trim())
+          );
+          if (numItems.length > 0) {
+            const rightmost = numItems.reduce((m, o) => o.transform[4] > m.transform[4] ? o : m);
+            result.tocEntries[cap] = {
+              pageIndex: tocIdx,
+              numX: rightmost.transform[4],
+              numXRight: rightmost.transform[4] + (rightmost.width || 0), // bordo destro per allineamento
+              numY: rightmost.transform[5],
+              oldNum: parseInt(rightmost.str.trim()),
+            };
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
+// ─────────────────────────────────────────────
+//  ASSEMBLAGGIO (pdf-lib)
+// ─────────────────────────────────────────────
+async function assemblaPDF(templateBuf, uploads, structure, opts, valoriModulo, customSections = []) {
+  const { PDFDocument, StandardFonts } = PDFLib;
+  const bgColor = hexToRgb(opts.footerBgColor);
+
+  const templateDoc = await PDFDocument.load(templateBuf.slice(0));
+  const finalDoc = await PDFDocument.create();
+  const font     = await finalDoc.embedFont(StandardFonts.Helvetica);
+  const boldFont = await finalDoc.embedFont(StandardFonts.HelveticaBold);
+
+  const allIdx = templateDoc.getPageIndices();
+  const copiate = await finalDoc.copyPages(templateDoc, allIdx);
+  copiate.forEach(p => finalDoc.addPage(p));
+
+  const delta = structure.footerInfo
+    ? structure.footerInfo.pageNum - structure.footerInfo.foundOnIdx : 1;
+
+  const sezioniOrdinati = SECTIONS.filter(k => structure.sections[k])
+    .sort((a,b) => structure.sections[a].pageIndex - structure.sections[b].pageIndex);
+
+  const sectionFinalStart = {};
+  let offset = 0;
+  // Track ALL originally-blank pages in the final doc (shift indices as we insert pages)
+  let blankFinalSet = new Set(structure.allBlankPageIndices || []);
+  const filledFinalSet = new Set(); // blank pages that received content
+
+  // Pagina bianca del template da usare come base per le pagine extra inserite
+  let blankTemplateIdx = null;
+  for (const bl of Object.values(structure.blankPagesPerSection)) {
+    if (bl.length > 0) { blankTemplateIdx = bl[0]; break; }
+  }
+
+  // ── INSERIMENTO CONTENUTO ──
+  for (const cap of sezioniOrdinati) {
+    const origTitleIdx = structure.sections[cap].pageIndex;
+    const finalTitleIdx = origTitleIdx + offset;
+    sectionFinalStart[cap] = finalTitleIdx;
+
+    const files = uploads[cap] || [];
+    const existingBlanks = (structure.blankPagesPerSection[cap] || []).map(bi => bi + offset);
+
+    if (files.length === 0) continue;
+
+    const titlePage = finalDoc.getPages()[finalTitleIdx];
+    const pW = titlePage.getWidth(), pH = titlePage.getHeight();
+    const cX = 40, cY = structure.footerHeight + 8;
+    const cW = pW - 80, cH = pH - structure.headerHeight - structure.footerHeight - 16;
+
+    let insertAt = existingBlanks.length > 0
+      ? existingBlanks[existingBlanks.length - 1] + 1 : finalTitleIdx + 1;
+    let blankUsed = 0;
+
+    for (const file of files) {
+      const buf = await leggiBuffer(file);
+      let embeddedPages;
+      try { embeddedPages = await finalDoc.embedPdf(buf); }
+      catch(e) { console.warn(`Impossibile leggere ${file.name}:`, e.message); continue; }
+
+      for (const ep of embeddedPages) {
+        let targetPage;
+        if (blankUsed < existingBlanks.length) {
+          const usedIdx = existingBlanks[blankUsed++];
+          filledFinalSet.add(usedIdx);
+          targetPage = finalDoc.getPages()[usedIdx];
+        } else {
+          const srcIdx = blankTemplateIdx !== null ? blankTemplateIdx : origTitleIdx;
+          const [cloned] = await finalDoc.copyPages(templateDoc, [srcIdx]);
+          finalDoc.insertPage(insertAt, cloned);
+          // Shift all tracked blank indices that are >= insertAt
+          blankFinalSet = new Set([...blankFinalSet].map(i => i >= insertAt ? i + 1 : i));
+          const newFilled = new Set([...filledFinalSet].map(i => i >= insertAt ? i + 1 : i));
+          filledFinalSet.clear(); newFilled.forEach(i => filledFinalSet.add(i));
+          targetPage = finalDoc.getPages()[insertAt];
+          insertAt++; offset++;
+        }
+        targetPage.drawRectangle({ x: cX, y: cY, width: cW, height: cH, color: PDFLib.rgb(1,1,1), borderWidth: 0 });
+        const isLandscape = ep.width > ep.height * 1.1;
+        if (isLandscape) {
+          // Rotate 90° CCW so landscape fills the portrait frame
+          const s = Math.min(cW / ep.height, cH / ep.width);
+          const dw = ep.height * s; // displayed width after rotation
+          const dh = ep.width * s;  // displayed height after rotation
+          const ax = cX + (cW + dw) / 2;
+          const ay = cY + (cH - dh) / 2;
+          targetPage.drawPage(ep, { x: ax, y: ay, width: ep.width * s, height: ep.height * s, rotate: PDFLib.degrees(90) });
+        } else {
+          const aspect = ep.width / ep.height;
+          let dw = cW, dh = dw / aspect;
+          if (dh > cH) { dh = cH; dw = dh * aspect; }
+          targetPage.drawPage(ep, { x: cX + (cW - dw) / 2, y: cY + (cH - dh) / 2, width: dw, height: dh });
+        }
+      }
+    }
+  }
+
+  // ── RIMOZIONE TUTTE LE PAGINE BIANCHE NON USATE ──
+  // Rimuove sia le pagine bianche pre-allocate non usate sia le "annex" e altri blank sparsi
+  // Protegge pagine di titolo sezione e pagina identificativa (non rimuoverle anche se brevi)
+  let identFinalIdx = structure.identPageIndex;
+  const protectedPages = new Set([
+    identFinalIdx,
+    ...SECTIONS.filter(k => sectionFinalStart[k] !== undefined).map(k => sectionFinalStart[k]),
+  ]);
+  const toRemoveBlanks = [...blankFinalSet]
+    .filter(i => !filledFinalSet.has(i) && !protectedPages.has(i))
+    .sort((a, b) => b - a);
+  for (const rmIdx of toRemoveBlanks) {
+    finalDoc.removePage(rmIdx);
+    for (const cap of SECTIONS) {
+      if (sectionFinalStart[cap] !== undefined && sectionFinalStart[cap] > rmIdx) sectionFinalStart[cap]--;
+    }
+    if (rmIdx < identFinalIdx) identFinalIdx--;
+  }
+
+  // ── RISCRITTURA PAGINA IDENTIFICATIVA ──
+  if (valoriModulo) {
+    if (blankTemplateIdx !== null) {
+      const [cleanBase] = await finalDoc.copyPages(templateDoc, [blankTemplateIdx]);
+      finalDoc.removePage(identFinalIdx);
+      finalDoc.insertPage(identFinalIdx, cleanBase);
+    }
+
+    const idPage = finalDoc.getPages()[identFinalIdx];
+    const pageW = idPage.getWidth(), pageH = idPage.getHeight();
+    const hH = Math.max(structure.headerHeight, 52);
+    const fH = Math.max(structure.footerHeight, 42);
+    const bodyX = 44, bodyW = pageW - 88;
+    const bodyY = fH + 4, bodyH = pageH - hH - fH - 8;
+
+    // Cancella corpo con bianco piena larghezza
+    idPage.drawRectangle({ x: 0, y: bodyY, width: pageW, height: bodyH, color: PDFLib.rgb(1,1,1), borderWidth: 0 });
+
+    // Intestazione tabella
+    const topLineY = bodyY + bodyH - 5;
+    idPage.drawLine({ start: {x:bodyX, y:topLineY}, end: {x:bodyX+bodyW, y:topLineY},
+      thickness: 0.6, color: PDFLib.rgb(0.5,0.5,0.5) });
+
+    const labelW = 155, valX = bodyX + labelW + 4, valW = bodyW - labelW - 4;
+    const rowH = 24;
+    const grey = PDFLib.rgb(0.91, 0.91, 0.91);
+    let curY = topLineY - 2;
+
+    const ROWS = [
+      ['Manufacturer',            ['Costruttore', '_addr1', '_addr2']],
+      ["Manufacturer's order no.", ["Numero d'ordine del produttore"]],
+      ['Gear pump',               ['Tipo di pompa']],
+      ['Manual date of delivery', ['Data di consegna del manuale']],
+      ['Customer',                ['Cliente']],
+      ["Customer's purchase no.", ['Numero di ordine cliente']],
+      ['User',                    ['Utente']],
+      ['Installation site',       ['Luogo di installazione']],
+      ['Country',                 ['Paese']],
+      ['TAG number',              ['Numero TAG']],
+      ['Line',                    ['Linea']],
+    ];
+
+    for (const [label, keys] of ROWS) {
+      if (curY < bodyY + rowH) break;
+      const rH = rowH * keys.length;
+      idPage.drawRectangle({ x: valX, y: curY - rH + 2, width: valW, height: rH - 2, color: grey, borderWidth: 0 });
+      // Label centrato verticalmente nell'intera riga
+      idPage.drawText(label, { x: bodyX + 4, y: curY - rH / 2 - 3, size: 8.5, font: boldFont, color: PDFLib.rgb(0.1,0.1,0.1) });
+      // Valori centrati verticalmente nella loro sotto-riga
+      keys.forEach((k, ki) => {
+        const val = valoriModulo[k] || '';
+        if (val) idPage.drawText(val, { x: valX + 6, y: curY - rowH * (ki + 0.5) - 3, size: 9, font, color: PDFLib.rgb(0,0,0) });
+      });
+      idPage.drawLine({ start: {x:bodyX, y:curY-rH}, end: {x:bodyX+bodyW, y:curY-rH}, thickness: 0.25, color: PDFLib.rgb(0.75,0.75,0.75) });
+      curY -= rH;
+    }
+  }
+
+  // ── INSERIMENTO SEZIONI PERSONALIZZATE ──
+  for (const cs of customSections) {
+    if (!cs.files || cs.files.length === 0) continue;
+    // Trova punto di inserimento: prima della sezione successiva a cs.after, o fine doc
+    const afterIdx = sezioniOrdinati.indexOf(cs.after);
+    const nextCap = sezioniOrdinati[afterIdx + 1];
+    let insertAt = (nextCap && sectionFinalStart[nextCap] !== undefined)
+      ? sectionFinalStart[nextCap]
+      : finalDoc.getPageCount();
+    const refPg = finalDoc.getPages()[Math.max(0, insertAt - 1)];
+    const rpW = refPg.getWidth(), rpH = refPg.getHeight();
+    const csX = 40, csY = structure.footerHeight + 8;
+    const csW = rpW - 80, csH = rpH - structure.headerHeight - structure.footerHeight - 16;
+    for (const file of cs.files) {
+      const buf = await leggiBuffer(file);
+      let embeddedPages;
+      try { embeddedPages = await finalDoc.embedPdf(buf); }
+      catch(e) { console.warn(`CS: ${file.name}:`, e.message); continue; }
+      for (const ep of embeddedPages) {
+        const srcIdx = blankTemplateIdx !== null ? blankTemplateIdx : 0;
+        const [cloned] = await finalDoc.copyPages(templateDoc, [srcIdx]);
+        finalDoc.insertPage(insertAt, cloned);
+        const tp = finalDoc.getPages()[insertAt];
+        tp.drawRectangle({ x: csX, y: csY, width: csW, height: csH, color: PDFLib.rgb(1,1,1), borderWidth: 0 });
+        const isLs = ep.width > ep.height * 1.1;
+        if (isLs) {
+          const s = Math.min(csW / ep.height, csH / ep.width);
+          const dw = ep.height * s, dh = ep.width * s;
+          tp.drawPage(ep, { x: csX+(csW+dw)/2, y: csY+(csH-dh)/2, width: ep.width*s, height: ep.height*s, rotate: PDFLib.degrees(90) });
+        } else {
+          const asp = ep.width / ep.height;
+          let dw = csW, dh = dw / asp;
+          if (dh > csH) { dh = csH; dw = dh * asp; }
+          tp.drawPage(ep, { x: csX+(csW-dw)/2, y: csY+(csH-dh)/2, width: dw, height: dh });
+        }
+        // Aggiorna indici per le sezioni che vengono dopo
+        for (const cap of SECTIONS) {
+          if (sectionFinalStart[cap] !== undefined && sectionFinalStart[cap] >= insertAt) sectionFinalStart[cap]++;
+        }
+        if (identFinalIdx >= insertAt) identFinalIdx++;
+        insertAt++;
+      }
+    }
+  }
+
+  // ── AGGIORNAMENTO NUMERI PAGINA ──
+  if (opts.updateNums && structure.footerInfo) {
+    const fi = structure.footerInfo;
+    const firstSecKey = sezioniOrdinati[0];
+    if (firstSecKey && sectionFinalStart[firstSecKey] !== undefined) {
+      const startIdx = sectionFinalStart[firstSecKey];
+      const pages = finalDoc.getPages();
+      for (let i = startIdx; i < pages.length; i++) {
+        const pg = pages[i];
+        const pW2 = pg.getWidth();
+        const ns = String(i + delta);
+        const tw = font.widthOfTextAtSize(ns, 10);
+        // Cancella TUTTI i numeri del footer rilevati (sinistra E destra)
+        if (structure.footerAllNums) {
+          for (const fn of structure.footerAllNums) {
+            pg.drawRectangle({ x: fn.x - 2, y: fi.y - 1, width: (fn.w || 20) + 8, height: 12, color: bgColor, borderWidth: 0 });
+          }
+        }
+        // Copre sempre anche la zona destra (105pt) per sicurezza
+        pg.drawRectangle({ x: pW2 - 105, y: fi.y - 1, width: 107, height: 12, color: bgColor, borderWidth: 0 });
+        pg.drawText(ns, { x: pW2 - 22 - tw, y: fi.y + 1, size: 10, font, color: PDFLib.rgb(0,0,0) });
+      }
+    }
+  }
+
+  // ── AGGIORNAMENTO TOC ──
+  if (opts.updateToc && structure.tocPageIndices.length > 0) {
+    const fi = structure.footerInfo;
+    const pages = finalDoc.getPages();
+    for (const cap of SECTIONS) {
+      const entry = structure.tocEntries[cap];
+      if (!entry || !structure.sections[cap]) continue;
+      const finalIdx = sectionFinalStart[cap] !== undefined ? sectionFinalStart[cap] : structure.sections[cap].pageIndex;
+      const newPageNum = fi ? finalIdx + delta : entry.oldNum;
+      if (newPageNum === entry.oldNum) continue;
+      const tocPg = pages[entry.pageIndex];
+      const ns = String(newPageNum);
+      const tw = font.widthOfTextAtSize(ns, 10);
+      // Allinea a destra: il bordo destro del nuovo numero coincide con quello dell'originale
+      const rx = entry.numXRight || (entry.numX + font.widthOfTextAtSize(String(entry.oldNum), 10) + 2);
+      const eraseW = Math.max(tw, font.widthOfTextAtSize('999', 10)) + 8;
+      tocPg.drawRectangle({ x: rx - eraseW, y: entry.numY - 2, width: eraseW + 2, height: 12, color: bgColor, borderWidth: 0 });
+      tocPg.drawText(ns, { x: rx - tw, y: entry.numY + 1, size: 10, font, color: PDFLib.rgb(0,0,0) });
+    }
+  }
+
+  return await finalDoc.save();
+}
+
+// ─────────────────────────────────────────────
+//  SEZIONI PERSONALIZZATE
+// ─────────────────────────────────────────────
+let _csCounter = 0;
+function addCustomSection() {
+  const n = _csCounter++;
+  const div = document.createElement('div');
+  div.className = 'cs-item';
+  div.id = 'cs_' + n;
+  div.dataset.csid = n;
+  div.innerHTML = `
+    <input type="text" id="cs_${n}_title" placeholder="Titolo sezione (es. Test Reports, Certificati…)">
+    <select id="cs_${n}_after">
+      <option value="end">Alla fine del documento</option>
+      <option value="14.7">Dopo cap. 14.7 — Data Sheet</option>
+      <option value="14.8">Dopo cap. 14.8 — Drawings</option>
+      <option value="14.9">Dopo cap. 14.9 — Parts Lists</option>
+      <option value="14.10">Dopo cap. 14.10 — CE Declaration</option>
+    </select>
+    <input type="file" id="cs_${n}_files" accept=".pdf" multiple>
+    <button type="button" class="cs-remove" onclick="document.getElementById('cs_${n}').remove()">✕ Rimuovi</button>
+  `;
+  document.getElementById('customSectionsList').appendChild(div);
+}
+
+// ─────────────────────────────────────────────
+//  AUTO-ANALISI TEMPLATE AL CARICAMENTO
+// ─────────────────────────────────────────────
+function toggleDati(el) {
+  const body = document.getElementById('datiBody');
+  const arrow = el.querySelector('.dati-arrow');
+  const open = body.style.display === 'flex';
+  body.style.display = open ? 'none' : 'flex';
+  body.style.flexDirection = 'column';
+  if (arrow) arrow.style.transform = open ? '' : 'rotate(180deg)';
+}
+
+async function onTemplateSelected(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  if (file.name.toLowerCase().endsWith('.docx') || file.name.toLowerCase().endsWith('.doc')) {
+    stato('err', 'Formato non supportato', 'Per file Word: File → Salva come → PDF, poi ricarica.', '⚠');
+    input.value = '';
+    return;
+  }
+
+  stato('loading', 'Analisi template...', 'Rilevamento capitoli e struttura documento...', '⚙️');
+  document.getElementById('sectionTags').innerHTML = '';
+
+  try {
+    const buf = await leggiBuffer(file);
+    const structure = await analizzaTemplate(buf);
+    window._lastStructure = structure;
+
+    const tagsEl = document.getElementById('sectionTags');
+    let found = 0;
+    for (const cap of SECTIONS) {
+      const tag = document.createElement('span');
+      if (structure.sections[cap]) {
+        tag.className = 'stag found';
+        tag.textContent = cap + ' ✓ (p.' + (structure.sections[cap].pageIndex + 1) + ')';
+        found++;
+      } else {
+        tag.className = 'stag missing';
+        tag.textContent = cap + ' —';
+      }
+      tagsEl.appendChild(tag);
+    }
+
+    const fieldsFound = Object.keys(structure.campiModulo || {}).length;
+    const footNote = structure.footerInfo
+      ? `Footer: x=${Math.round(structure.footerInfo.x)}, y=${Math.round(structure.footerInfo.y)} pt · ${fieldsFound}/11 campi form`
+      : `Footer non rilevato · ${fieldsFound}/11 campi form`;
+
+    const tocNote = structure.tocPageIndices.length > 0
+      ? ` · Indice: pagina ${structure.tocPageIndices.map(i=>i+1).join(', ')}`
+      : ' · Indice non trovato';
+
+    if (found > 0) {
+      stato('ok', `${found} capitoli trovati`, footNote + tocNote, '✓');
+    } else {
+      stato('err', 'Nessun capitolo trovato', 'Verificare che 14.7/14.8/14.9/14.10 siano presenti come testo nel PDF (non come immagine).', '⚠');
+    }
+  } catch(e) {
+    stato('err', 'Errore analisi', e.message, '❌');
+  }
+}
+
+// ─────────────────────────────────────────────
+//  ENTRY POINT
+// ─────────────────────────────────────────────
+async function avviaCompilazione() {
+  const templateFile = document.getElementById('manuale_base').files[0];
+  if (!templateFile) { stato('err', 'Errore', 'Caricare il template PDF.', '⚠'); return; }
+
+  const uploads = {};
+  for (const cap of SECTIONS) {
+    const id = 'pdf_' + cap.replace('.', '_');
+    uploads[cap] = Array.from(document.getElementById(id).files || []);
+  }
+  const hasUploads = SECTIONS.some(k => uploads[k].length > 0);
+  if (!hasUploads) { stato('err', 'Errore', 'Caricare almeno un file allegato.', '⚠'); return; }
+
+  const btn = document.getElementById('mainBtn');
+  btn.disabled = true;
+
+  try {
+    // Rianalizza se non già fatto
+    stato('loading', 'Analisi struttura...', 'Rilevamento capitoli, numeri pagina e indice...', '⚙️');
+    const templateBuf = await leggiBuffer(templateFile);
+    const structure = window._lastStructure || await analizzaTemplate(templateBuf);
+
+    const foundSections = SECTIONS.filter(k => structure.sections[k]);
+    const totalFiles = SECTIONS.reduce((s,k) => s + (uploads[k]||[]).length, 0);
+    stato('loading', 'Assemblaggio PDF...', `${foundSections.length} capitoli · ${totalFiles} file da inserire...`, '⚙️');
+
+    const opts = { updateNums: true, updateToc: true, footerBgColor: '#ffffff' };
+
+    const fmt = v => document.getElementById(v)?.value.trim() || '';
+    const rawData = document.getElementById('d_data_consegna').value;
+    const dataFmt = rawData ? rawData.split('-').reverse().join('/') : '';
+    const valoriModulo = {
+      "Costruttore": fmt('d_costruttore'),
+      "_addr1": fmt('d_addr1'),
+      "_addr2": fmt('d_addr2'),
+      "Numero d'ordine del produttore": fmt('d_ordine_prod'),
+      "Tipo di pompa": fmt('d_tipo_pompa'),
+      "Data di consegna del manuale": dataFmt,
+      "Cliente": fmt('d_cliente'),
+      "Numero di ordine cliente": fmt('d_ordine_cliente'),
+      "Utente": fmt('d_utente'),
+      "Luogo di installazione": fmt('d_luogo'),
+      "Paese": fmt('d_paese'),
+      "Numero TAG": fmt('d_tag'),
+      "Linea": fmt('d_linea'),
+    };
+
+    // Raccoglie sezioni personalizzate
+    const customSections = [];
+    document.querySelectorAll('.cs-item').forEach(item => {
+      const n = item.dataset.csid;
+      const title = document.getElementById('cs_' + n + '_title')?.value.trim() || 'Sezione';
+      const after = document.getElementById('cs_' + n + '_after')?.value || 'end';
+      const files = Array.from(document.getElementById('cs_' + n + '_files')?.files || []);
+      if (files.length > 0) customSections.push({ title, after, files });
+    });
+
+    const pdfBytes = await assemblaPDF(templateBuf, uploads, structure, opts, valoriModulo, customSections);
+
+    const dt = new Date().toISOString().slice(0,10);
+    const filename = `MANUALE_MAAG_COMPILATO_${dt}.pdf`;
+    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+    const blobUrl = URL.createObjectURL(blob);
+
+    // Mostra pulsante persistente (utile su Android/mobile)
+    const openBtn = document.getElementById('openPdfBtn');
+    if (openBtn) {
+      openBtn.href = blobUrl;
+      openBtn.download = filename;
+      openBtn.style.display = 'flex';
+    }
+
+    // Prova Web Share API (Android, iOS) — funziona senza popup bloccati
+    let sharedViaApi = false;
+    if (typeof navigator.share === 'function') {
+      try {
+        const shareFile = new File([pdfBytes], filename, { type: 'application/pdf' });
+        const canShare = navigator.canShare ? navigator.canShare({ files: [shareFile] }) : false;
+        if (canShare) {
+          await navigator.share({ files: [shareFile], title: 'Manuale MAAG Compilato' });
+          sharedViaApi = true;
+        }
+      } catch(e) {
+        if (e.name === 'AbortError') sharedViaApi = true; // utente ha chiuso il pannello
+      }
+    }
+
+    // Fallback: download standard
+    if (!sharedViaApi) {
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    const dettaglio = foundSections.map(k => {
+      const n = (uploads[k]||[]).length;
+      return n > 0 ? `${k}(${n}f)` : null;
+    }).filter(Boolean).join(' · ');
+
+    const csNote = customSections.length > 0 ? ` · ${customSections.length} sez. extra` : '';
+    stato('ok', 'Compilazione completata!', `Download avviato · ${dettaglio}` +
+      (structure.footerInfo ? ' · Numerazione aggiornata' : '') +
+      (structure.tocPageIndices.length > 0 ? ' · Indice aggiornato' : '') + csNote, '✓');
+
+  } catch(e) {
+    console.error(e);
+    stato('err', 'Errore compilazione', e.message, '❌');
+  } finally {
+    btn.disabled = false;
+  }
+}
+</script>
+</body>
+</html>
