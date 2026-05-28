@@ -287,7 +287,9 @@ input[type="file"]::-webkit-file-upload-button:hover { background: #e4e4e7; }
       <div class="dati-body" id="datiBody">
         <div style="height:10px"></div>
         <div class="dati-grid">
-          <div class="dati-field full"><label>Costruttore</label><input type="text" id="d_costruttore" placeholder="es. MAAG Pump Systems AG"></div>
+          <div class="dati-field full"><label>Costruttore / Manufacturer</label><input type="text" id="d_costruttore" placeholder="es. MAAG Pump Systems AG"></div>
+          <div class="dati-field full"><label>Indirizzo / Address</label><input type="text" id="d_addr1" placeholder="Via / Str. / Address line 1"></div>
+          <div class="dati-field full"><label>Indirizzo (riga 2) / Address line 2</label><input type="text" id="d_addr2" placeholder="CAP, Città / ZIP, City, Country"></div>
           <div class="dati-field"><label>N° ordine produttore</label><input type="text" id="d_ordine_prod"></div>
           <div class="dati-field"><label>Tipo di pompa</label><input type="text" id="d_tipo_pompa"></div>
           <div class="dati-field full"><label>Data consegna manuale</label><input type="date" id="d_data_consegna"></div>
@@ -433,13 +435,16 @@ async function analizzaTemplate(buffer) {
   const nPag = pdfjs.numPages;
   const result = {
     numPages: nPag,
-    sections: {},       // { '14.7': { pageIndex: N } }  0-based
-    tocPageIndices: [], // 0-based
-    tocEntries: {},     // { '14.7': { pageIndex, numX, numY, oldNum } }
-    footerInfo: null,   // { x, y, pageNum, foundOnIdx, pageHeight }
+    sections: {},
+    tocPageIndices: [],
+    tocEntries: {},
+    footerInfo: null,
     headerHeight: 55,
     footerHeight: 45,
+    blankPagesPerSection: {},
+    identPageIndex: 2,
   };
+  const _bodyContentMap = {}; // pIdx -> bool (ha contenuto nel body)
 
   // ── scansione pagine ──
   for (let p = 1; p <= nPag; p++) {
@@ -469,6 +474,10 @@ async function analizzaTemplate(buffer) {
       }
     }
 
+    // Rileva se la pagina ha contenuto nel body (non solo header/footer)
+    const bodyItems = items.filter(it => it.transform[5] > 60 && it.transform[5] < vp.height - 50 && it.str.trim().length > 0);
+    _bodyContentMap[pIdx] = bodyItems.length > 0;
+
     // Numero pagina nel footer — scansiona TUTTE le pagine post-TOC e prende il numero più a DESTRA in assoluto
     if (p > (result.tocPageIndices.length > 0 ? result.tocPageIndices[result.tocPageIndices.length-1]+2 : 5)) {
       let pageBest = null;
@@ -486,6 +495,17 @@ async function analizzaTemplate(buffer) {
         result.footerHeight = Math.max(35, Math.round(pageBest.y) + 12);
       }
     }
+  }
+
+  // ── pagine bianche disponibili dopo ogni sezione ──
+  for (const cap of SECTIONS) {
+    if (!result.sections[cap]) continue;
+    const titleIdx = result.sections[cap].pageIndex;
+    const blanks = [];
+    for (let bi = titleIdx + 1; bi < nPag; bi++) {
+      if (_bodyContentMap[bi] === false) { blanks.push(bi); } else { break; }
+    }
+    result.blankPagesPerSection[cap] = blanks;
   }
 
   // ── rilevamento posizioni campi modulo (prime 10 pagine) ──
@@ -537,6 +557,14 @@ async function analizzaTemplate(buffer) {
       }
     }
   }
+
+  // ── pagina identificativa: quella con più campi rilevati ──
+  const pageCounts = {};
+  for (const pos of Object.values(result.campiModulo)) {
+    if (pos) pageCounts[pos.pageIndex] = (pageCounts[pos.pageIndex] || 0) + 1;
+  }
+  const bestIdent = Object.entries(pageCounts).sort((a,b) => b[1]-a[1])[0];
+  if (bestIdent) result.identPageIndex = parseInt(bestIdent[0]);
 
   // ── rilevamento altezza header dalla prima pagina sezione ──
   const firstSecKey = SECTIONS.find(k => result.sections[k]);
@@ -628,65 +656,69 @@ async function assemblaPDF(templateBuf, uploads, structure, opts, valoriModulo) 
     const titlePage = finalDoc.getPages()[finalTitleIdx];
     const pW = titlePage.getWidth();
     const pH = titlePage.getHeight();
+    const cX = 40, cY = structure.footerHeight + 8;
+    const cW = pW - 80, cH = pH - structure.headerHeight - structure.footerHeight - 16;
 
-    const cX = 40;
-    const cY = structure.footerHeight + 8;
-    const cW = pW - 80;
-    const cH = pH - structure.headerHeight - structure.footerHeight - 16;
-
-    let insertAt = finalTitleIdx + 1;
+    // Pagine bianche già presenti nel template dopo il titolo (indici nel finalDoc)
+    const existingBlanks = (structure.blankPagesPerSection[cap] || []).map(bi => bi + offset);
+    // Inserisci nuove pagine DOPO le pagine bianche esistenti
+    let insertAt = existingBlanks.length > 0
+      ? existingBlanks[existingBlanks.length - 1] + 1
+      : finalTitleIdx + 1;
+    let blankUsed = 0;
 
     for (const file of files) {
       const buf = await leggiBuffer(file);
       let embeddedPages;
-      try {
-        embeddedPages = await finalDoc.embedPdf(buf);
-      } catch(e) {
-        console.warn(`Impossibile leggere ${file.name}:`, e.message);
-        continue;
-      }
+      try { embeddedPages = await finalDoc.embedPdf(buf); }
+      catch(e) { console.warn(`Impossibile leggere ${file.name}:`, e.message); continue; }
 
       for (const ep of embeddedPages) {
-        // Clona la pagina del titolo come base (ha intestazione e piè di pagina MAAG)
-        const [cloned] = await finalDoc.copyPages(templateDoc, [origTitleIdx]);
-        finalDoc.insertPage(insertAt, cloned);
-
-        const newPage = finalDoc.getPages()[insertAt];
-
-        // Scala il documento inserito al'area contenuto
+        let targetPage;
+        if (blankUsed < existingBlanks.length) {
+          // Usa pagina bianca già esistente nel template
+          targetPage = finalDoc.getPages()[existingBlanks[blankUsed]];
+          blankUsed++;
+        } else {
+          // Inserisci nuova pagina clonata dal titolo (mantiene header/footer MAAG)
+          const [cloned] = await finalDoc.copyPages(templateDoc, [origTitleIdx]);
+          finalDoc.insertPage(insertAt, cloned);
+          targetPage = finalDoc.getPages()[insertAt];
+          insertAt++; offset++;
+        }
+        // Pulisci l'area contenuto (copre eventuali segnaposto del template)
+        targetPage.drawRectangle({ x: cX, y: cY, width: cW, height: cH,
+          color: PDFLib.rgb(1,1,1), borderWidth: 0 });
+        // Scala e disegna la pagina del documento caricato
         const aspect = ep.width / ep.height;
         let dw = cW, dh = dw / aspect;
         if (dh > cH) { dh = cH; dw = dh * aspect; }
-        const dx = cX + (cW - dw) / 2;
-        const dy = cY + (cH - dh) / 2;
-
-        newPage.drawPage(ep, { x: dx, y: dy, width: dw, height: dh });
-
-        insertAt++;
-        offset++;
+        targetPage.drawPage(ep, {
+          x: cX + (cW - dw) / 2, y: cY + (cH - dh) / 2, width: dw, height: dh });
       }
     }
   }
 
   // ── AGGIORNAMENTO NUMERI PAGINA ──
+  // Usa margine destro FISSO (non dipende dal rilevamento fi.x che può essere impreciso)
   if (opts.updateNums && structure.footerInfo) {
     const fi = structure.footerInfo;
     const firstSecKey = sezioniOrdinati[0];
     if (firstSecKey) {
       const startIdx = structure.sections[firstSecKey].pageIndex;
       const pages = finalDoc.getPages();
-      // Bordo destro del numero originale — usato per allineamento a destra
-      const origNumW = fi.w > 2 ? fi.w : Math.max(font.widthOfTextAtSize(String(fi.pageNum), 10), 14);
-      const fiRight = fi.x + origNumW + 2;
+      const numY = fi.y; // usa Y rilevato (affidabile)
       for (let i = startIdx; i < pages.length; i++) {
         const pg = pages[i];
+        const pageW = pg.getWidth();
         const newNum = i + delta;
         const ns = String(newNum);
         const tw = font.widthOfTextAtSize(ns, 10);
-        // Rettangolo largo 40pt a sinistra del bordo destro: copre qualsiasi numero 1-4 cifre
-        pg.drawRectangle({ x: fiRight - 40, y: fi.y - 1, width: 42, height: 12, color: bgColor, borderWidth: 0 });
-        // Numero allineato a DESTRA rispetto al bordo destro originale
-        pg.drawText(ns, { x: fiRight - tw - 1, y: fi.y + 1, size: 10, font, color: PDFLib.rgb(0,0,0) });
+        // Margine destro fisso: 22pt dal bordo della pagina — SEMPRE a destra
+        const numX = pageW - 22 - tw;
+        // Copre 80pt sul lato destro del footer: cancella il numero originale ovunque sia
+        pg.drawRectangle({ x: pageW - 105, y: numY - 1, width: 107, height: 12, color: bgColor, borderWidth: 0 });
+        pg.drawText(ns, { x: numX, y: numY + 1, size: 10, font, color: PDFLib.rgb(0,0,0) });
       }
     }
   }
@@ -720,31 +752,71 @@ async function assemblaPDF(templateBuf, uploads, structure, opts, valoriModulo) 
     }
   }
 
-  // ── SCRITTURA DATI IDENTIFICATIVI ──
+  // ── RISCRITTURA PAGINA IDENTIFICATIVA ──
+  // Cancella il contenuto esistente e ridisegna il form con i dati utente
   if (valoriModulo) {
+    const boldFont = await finalDoc.embedFont(PDFLib.StandardFonts.HelveticaBold);
     const pages = finalDoc.getPages();
-    const campiEntries = Object.entries(structure.campiModulo || {});
+    const identIdx = Math.min(structure.identPageIndex, pages.length - 1);
+    const idPage = pages[identIdx];
+    const pageW = idPage.getWidth();
+    const pageH = idPage.getHeight();
+    const hH = Math.max(structure.headerHeight, 52);
+    const fH = Math.max(structure.footerHeight, 42);
+    const bodyX = 44, bodyW = pageW - 88;
+    const bodyY = fH + 4, bodyH = pageH - hH - fH - 8;
 
-    // Calcola colonna valori uniforme: bordo destro max di tutte le etichette rilevate + gap
-    // Così tutti i valori sono allineati nella stessa colonna (cella grigia)
-    let maxLabelRight = 0;
-    for (const [etichetta, pos] of campiEntries) {
-      if (!pos) continue;
-      const sz = Math.max(8, Math.min(pos.fontSize || 10, 11));
-      const lText = pos.detectedText || etichetta;
-      const estW = pos.itemWidth > 5 ? pos.itemWidth : font.widthOfTextAtSize(lText, sz);
-      const right = pos.x + estW;
-      if (right > maxLabelRight) maxLabelRight = right;
-    }
-    // Fallback se nessun campo rilevato
-    const valueColX = maxLabelRight > 20 ? maxLabelRight + 18 : 220;
+    // Cancella corpo pagina (bianco)
+    idPage.drawRectangle({ x: bodyX - 4, y: bodyY, width: bodyW + 8, height: bodyH,
+      color: PDFLib.rgb(1,1,1), borderWidth: 0 });
 
-    for (const [etichetta, pos] of campiEntries) {
-      const valore = valoriModulo[etichetta];
-      if (!valore || !pos) continue;
-      const page = pages[pos.pageIndex];
-      const sz = Math.max(8, Math.min(pos.fontSize || 10, 11));
-      page.drawText(valore, { x: valueColX, y: pos.y + 1, size: sz, font, color: PDFLib.rgb(0,0,0) });
+    // Titolo sezione
+    idPage.drawText('Identification', { x: bodyX, y: bodyY + bodyH - 18,
+      size: 12, font: boldFont, color: PDFLib.rgb(0,0,0) });
+    const titleLineY = bodyY + bodyH - 24;
+    idPage.drawLine({ start: {x: bodyX, y: titleLineY}, end: {x: bodyX + bodyW, y: titleLineY},
+      thickness: 0.7, color: PDFLib.rgb(0.4,0.4,0.4) });
+
+    const labelW = 155, valX = bodyX + labelW + 5, valW = bodyW - labelW - 5;
+    const rowH = 22;
+    const grey = PDFLib.rgb(0.91,0.91,0.91);
+
+    // Righe del form: [etichetta, chiavi in valoriModulo, numero righe riservate]
+    const ROWS = [
+      ['Manufacturer / Costruttore', ['Costruttore', '_addr1', '_addr2'], 3],
+      ["Mfr's order number",         ["Numero d'ordine del produttore"],  1],
+      ['Gear pump / Pump type',       ['Tipo di pompa'],                   1],
+      ['Manual date of delivery',     ['Data di consegna del manuale'],    1],
+      ['Customer / Cliente',          ['Cliente'],                         1],
+      ["Customer's purchase number",  ['Numero di ordine cliente'],        1],
+      ['User / Utente',               ['Utente'],                          1],
+      ['Installation site / Luogo',   ['Luogo di installazione'],          1],
+      ['Country / Paese',             ['Paese'],                           1],
+      ['TAG number / Numero TAG',     ['Numero TAG'],                      1],
+      ['Line / Linea',                ['Linea'],                           1],
+    ];
+
+    let curY = titleLineY - 4;
+    for (const [label, keys, nLines] of ROWS) {
+      if (curY < bodyY + rowH) break;
+      const rH = rowH * nLines;
+      // Sfondo grigio cella valore
+      idPage.drawRectangle({ x: valX, y: curY - rH + 2, width: valW, height: rH - 2,
+        color: grey, borderWidth: 0 });
+      // Testo etichetta (centrato verticalmente)
+      idPage.drawText(label + ':', { x: bodyX + 2, y: curY - Math.ceil(rH/2) + 2,
+        size: 7.5, font, color: PDFLib.rgb(0.25,0.25,0.25) });
+      // Valori
+      let vY = curY - 4;
+      for (const k of keys) {
+        const val = valoriModulo[k] || '';
+        if (val) idPage.drawText(val, { x: valX + 5, y: vY, size: 9, font, color: PDFLib.rgb(0,0,0) });
+        vY -= rowH;
+      }
+      // Linea separatore
+      idPage.drawLine({ start: {x: bodyX, y: curY - rH}, end: {x: bodyX + bodyW, y: curY - rH},
+        thickness: 0.25, color: PDFLib.rgb(0.75,0.75,0.75) });
+      curY -= rH;
     }
   }
 
@@ -854,6 +926,8 @@ async function avviaCompilazione() {
     const dataFmt = rawData ? rawData.split('-').reverse().join('/') : '';
     const valoriModulo = {
       "Costruttore": fmt('d_costruttore'),
+      "_addr1": fmt('d_addr1'),
+      "_addr2": fmt('d_addr2'),
       "Numero d'ordine del produttore": fmt('d_ordine_prod'),
       "Tipo di pompa": fmt('d_tipo_pompa'),
       "Data di consegna del manuale": dataFmt,
