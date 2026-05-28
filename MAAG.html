@@ -650,6 +650,12 @@ async function assemblaPDF(templateBuf, uploads, structure, opts, valoriModulo) 
   let blankFinalSet = new Set(structure.allBlankPageIndices || []);
   const filledFinalSet = new Set(); // blank pages that received content
 
+  // Pagina bianca del template da usare come base per le pagine extra inserite
+  let blankTemplateIdx = null;
+  for (const bl of Object.values(structure.blankPagesPerSection)) {
+    if (bl.length > 0) { blankTemplateIdx = bl[0]; break; }
+  }
+
   // ── INSERIMENTO CONTENUTO ──
   for (const cap of sezioniOrdinati) {
     const origTitleIdx = structure.sections[cap].pageIndex;
@@ -683,7 +689,8 @@ async function assemblaPDF(templateBuf, uploads, structure, opts, valoriModulo) 
           filledFinalSet.add(usedIdx);
           targetPage = finalDoc.getPages()[usedIdx];
         } else {
-          const [cloned] = await finalDoc.copyPages(templateDoc, [origTitleIdx]);
+          const srcIdx = blankTemplateIdx !== null ? blankTemplateIdx : origTitleIdx;
+          const [cloned] = await finalDoc.copyPages(templateDoc, [srcIdx]);
           finalDoc.insertPage(insertAt, cloned);
           // Shift all tracked blank indices that are >= insertAt
           blankFinalSet = new Set([...blankFinalSet].map(i => i >= insertAt ? i + 1 : i));
@@ -775,13 +782,13 @@ async function assemblaPDF(templateBuf, uploads, structure, opts, valoriModulo) 
       if (curY < bodyY + rowH) break;
       const rH = rowH * keys.length;
       idPage.drawRectangle({ x: valX, y: curY - rH + 2, width: valW, height: rH - 2, color: grey, borderWidth: 0 });
-      idPage.drawText(label, { x: bodyX + 4, y: curY - Math.ceil(rH/2) + 3, size: 8.5, font: boldFont, color: PDFLib.rgb(0.1,0.1,0.1) });
-      let vY = curY - 6;
-      for (const k of keys) {
+      // Label centrato verticalmente nell'intera riga
+      idPage.drawText(label, { x: bodyX + 4, y: curY - rH / 2 - 3, size: 8.5, font: boldFont, color: PDFLib.rgb(0.1,0.1,0.1) });
+      // Valori centrati verticalmente nella loro sotto-riga
+      keys.forEach((k, ki) => {
         const val = valoriModulo[k] || '';
-        if (val) idPage.drawText(val, { x: valX + 6, y: vY, size: 9, font, color: PDFLib.rgb(0,0,0) });
-        vY -= rowH;
-      }
+        if (val) idPage.drawText(val, { x: valX + 6, y: curY - rowH * (ki + 0.5) - 3, size: 9, font, color: PDFLib.rgb(0,0,0) });
+      });
       idPage.drawLine({ start: {x:bodyX, y:curY-rH}, end: {x:bodyX+bodyW, y:curY-rH}, thickness: 0.25, color: PDFLib.rgb(0.75,0.75,0.75) });
       curY -= rH;
     }
