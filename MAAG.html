@@ -412,17 +412,21 @@ async function analizzaTemplate(buffer) {
       }
     }
 
-    // Rilevamento numero pagina nel footer (y < 65 pt)
+    // Rilevamento numero pagina nel footer — cerca il numero più a DESTRA in basso
     if (!result.footerInfo && p > (result.tocPageIndices.length > 0 ? result.tocPageIndices[result.tocPageIndices.length-1]+2 : 5)) {
+      let best = null;
       for (const it of items) {
         const y = it.transform[5];
         const x = it.transform[4];
         const txt = it.str.trim();
         if (y < 65 && y > 5 && /^\d{1,4}$/.test(txt) && parseInt(txt) > 0) {
-          result.footerInfo = { x, y, pageNum: parseInt(txt), foundOnIdx: pIdx, pageHeight: vp.height };
-          result.footerHeight = Math.max(35, Math.round(y) + 12);
-          break;
+          // prendi il numero con x più alto (più a destra)
+          if (!best || x > best.x) best = { x, y, pageNum: parseInt(txt), foundOnIdx: pIdx, pageHeight: vp.height, pageWidth: vp.width };
         }
+      }
+      if (best) {
+        result.footerInfo = best;
+        result.footerHeight = Math.max(35, Math.round(best.y) + 12);
       }
     }
   }
@@ -562,17 +566,19 @@ async function assemblaPDF(templateBuf, uploads, structure, opts) {
     const fi = structure.footerInfo;
     const firstSecKey = sezioniOrdinati[0];
     if (firstSecKey) {
-      const startIdx = structure.sections[firstSecKey].pageIndex; // non cambia — inseriamo DOPO
+      const startIdx = structure.sections[firstSecKey].pageIndex;
       const pages = finalDoc.getPages();
       for (let i = startIdx; i < pages.length; i++) {
         const pg = pages[i];
         const newNum = i + delta;
-        // Rettangolo copertura
-        pg.drawRectangle({ x: fi.x - 25, y: fi.y - 3, width: 70, height: 16, color: bgColor, borderWidth: 0 });
-        // Nuovo numero
         const ns = String(newNum);
         const tw = font.widthOfTextAtSize(ns, 10);
-        pg.drawText(ns, { x: fi.x + 10 - tw/2, y: fi.y + 1, size: 10, font, color: PDFLib.rgb(0,0,0) });
+        // Rettangolo chirurgico: copre solo i digit del vecchio numero senza toccare la riga blu sopra
+        const rectW = Math.max(tw, font.widthOfTextAtSize('999', 10)) + 6;
+        const rectH = 11; // altezza minima — non sale verso la riga blu
+        pg.drawRectangle({ x: fi.x - 2, y: fi.y - 1, width: rectW, height: rectH, color: bgColor, borderWidth: 0 });
+        // Numero allineato a sinistra della stessa posizione originale
+        pg.drawText(ns, { x: fi.x, y: fi.y + 1, size: 10, font, color: PDFLib.rgb(0,0,0) });
       }
     }
   }
@@ -597,11 +603,12 @@ async function assemblaPDF(templateBuf, uploads, structure, opts) {
       const tocPg = pages[entry.pageIndex];
       const ns = String(newPageNum);
       const tw = font.widthOfTextAtSize(ns, 10);
+      const maxW = font.widthOfTextAtSize('999', 10) + 6;
 
-      // Rettangolo copertura vecchio numero
-      tocPg.drawRectangle({ x: entry.numX - 5, y: entry.numY - 2, width: 45, height: 14, color: bgColor, borderWidth: 0 });
-      // Nuovo numero (allineato a destra come l'originale)
-      tocPg.drawText(ns, { x: entry.numX + 20 - tw, y: entry.numY + 1, size: 10, font, color: PDFLib.rgb(0,0,0) });
+      // Rettangolo chirurgico sul vecchio numero (allineato a destra)
+      tocPg.drawRectangle({ x: entry.numX - 2, y: entry.numY - 1, width: maxW, height: 11, color: bgColor, borderWidth: 0 });
+      // Nuovo numero allineato a destra (stessa posizione del vecchio)
+      tocPg.drawText(ns, { x: entry.numX + (maxW - tw) - 2, y: entry.numY + 1, size: 10, font, color: PDFLib.rgb(0,0,0) });
     }
   }
 
