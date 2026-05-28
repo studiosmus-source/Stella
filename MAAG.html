@@ -476,8 +476,8 @@ async function analizzaTemplate(buffer) {
         const y = it.transform[5];
         const x = it.transform[4];
         const txt = it.str.trim();
-        if (y < 65 && y > 5 && /^\d{1,4}$/.test(txt) && parseInt(txt) > 0) {
-          // prendi il numero con x più alto (più a destra)
+        if (y < 110 && y > 3 && x > vp.width * 0.4 && /^\d{1,4}$/.test(txt) && parseInt(txt) > 0) {
+          // prendi il numero con x più alto (più a destra), solo nella metà destra
           if (!best || x > best.x) best = { x, y, w: it.width || 0, pageNum: parseInt(txt), foundOnIdx: pIdx, pageHeight: vp.height, pageWidth: vp.width };
         }
       }
@@ -488,28 +488,37 @@ async function analizzaTemplate(buffer) {
     }
   }
 
-  // ── rilevamento posizioni campi modulo (prime 8 pagine) ──
-  const ETICHETTE = [
-    "Costruttore", "Numero d'ordine del produttore", "Tipo di pompa",
-    "Data di consegna del manuale", "Cliente", "Numero di ordine cliente",
-    "Utente", "Luogo di installazione", "Paese", "Numero TAG", "Linea"
+  // ── rilevamento posizioni campi modulo (prime 10 pagine) ──
+  // Usa keyword matching flessibile: funziona con abbreviazioni, N°, varianti linguistiche
+  const FIELD_MATCHERS = [
+    { field: "Costruttore",                    test: t => t.startsWith("costruttore") || t.startsWith("manufacturer") || t.startsWith("hersteller") },
+    { field: "Numero d'ordine del produttore", test: t => t.includes("produttore") && (t.includes("ordine") || t.includes("order") || t.includes("n°")) },
+    { field: "Tipo di pompa",                  test: t => (t.startsWith("tipo") && t.length < 20) || t.startsWith("pump type") },
+    { field: "Data di consegna del manuale",   test: t => t.startsWith("data") && (t.includes("consegna") || t.includes("delivery") || t.includes("datum")) },
+    { field: "Cliente",                        test: t => t === "cliente" || t === "customer" || t === "client" || t === "kunde" },
+    { field: "Numero di ordine cliente",       test: t => t.includes("ordine") && (t.includes("cliente") || t.includes("customer order") || t.includes("acquisto")) },
+    { field: "Utente",                         test: t => t === "utente" || t === "user" || t === "benutzer" || t === "utilisateur" },
+    { field: "Luogo di installazione",         test: t => t.startsWith("luogo") || t.startsWith("installation site") || t.startsWith("lieu") },
+    { field: "Paese",                          test: t => t === "paese" || t === "country" || t === "land" || t === "pays" },
+    { field: "Numero TAG",                     test: t => t === "tag" || t.startsWith("numero tag") || t.startsWith("n° tag") || t.startsWith("n.tag") || t.startsWith("tag number") },
+    { field: "Linea",                          test: t => t === "linea" || t === "line" || t === "linie" },
   ];
   result.campiModulo = {};
-  for (let p = 1; p <= Math.min(8, nPag); p++) {
+  for (let p = 1; p <= Math.min(10, nPag); p++) {
     const page = await pdfjs.getPage(p);
     const tc = await page.getTextContent();
-    for (const etichetta of ETICHETTE) {
-      if (result.campiModulo[etichetta]) continue;
-      for (const it of tc.items) {
-        const t = it.str.trim().replace(/:$/, '');
-        const matchLen = Math.min(etichetta.length, 14);
-        if (t === etichetta || t.replace(/:$/, '') === etichetta ||
-            (t.length >= matchLen && etichetta.startsWith(t.substring(0, matchLen)))) {
-          result.campiModulo[etichetta] = {
+    for (const it of tc.items) {
+      const tl = it.str.trim().replace(/:$/, '').trim().toLowerCase();
+      if (tl.length < 3) continue;
+      for (const fm of FIELD_MATCHERS) {
+        if (result.campiModulo[fm.field]) continue;
+        if (fm.test(tl)) {
+          result.campiModulo[fm.field] = {
             pageIndex: p - 1,
             x: it.transform[4],
             y: it.transform[5],
             itemWidth: it.width || 0,
+            detectedText: it.str.trim().replace(/:$/, '').trim(),
             fontSize: Math.round(Math.abs(it.transform[3])) || 10,
           };
           break;
@@ -708,11 +717,11 @@ async function assemblaPDF(templateBuf, uploads, structure, opts, valoriModulo) 
       if (!valore || !pos) continue;
       const page = pages[pos.pageIndex];
       const sz = Math.max(8, Math.min(pos.fontSize || 10, 11));
-      // Larghezza effettiva: usa it.width se disponibile, altrimenti stima da fontSize e lunghezza testo
-      const effectiveW = pos.itemWidth > 5
-        ? pos.itemWidth
-        : (pos.fontSize || 10) * 0.58 * etichetta.length;
-      const valX = pos.x + effectiveW + 12;
+      // Usa il testo realmente rilevato nel PDF per stimare la larghezza dell'etichetta con font Helvetica
+      const labelForWidth = pos.detectedText || etichetta;
+      const estW = font.widthOfTextAtSize(labelForWidth, sz);
+      const effectiveW = pos.itemWidth > 5 ? pos.itemWidth : estW;
+      const valX = pos.x + effectiveW + 15;
       page.drawText(valore, { x: valX, y: pos.y + 1, size: sz, font, color: PDFLib.rgb(0,0,0) });
     }
   }
@@ -765,9 +774,10 @@ async function onTemplateSelected(input) {
       tagsEl.appendChild(tag);
     }
 
+    const fieldsFound = Object.keys(structure.campiModulo || {}).length;
     const footNote = structure.footerInfo
-      ? `Numero pagina rilevato a y=${Math.round(structure.footerInfo.y)} pt`
-      : 'Numero pagina non rilevato automaticamente';
+      ? `Footer: x=${Math.round(structure.footerInfo.x)}, y=${Math.round(structure.footerInfo.y)} pt · ${fieldsFound}/11 campi form`
+      : `Footer non rilevato · ${fieldsFound}/11 campi form`;
 
     const tocNote = structure.tocPageIndices.length > 0
       ? ` · Indice: pagina ${structure.tocPageIndices.map(i=>i+1).join(', ')}`
