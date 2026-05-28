@@ -625,46 +625,44 @@ async function assemblaPDF(templateBuf, uploads, structure, opts, valoriModulo) 
 
   const templateDoc = await PDFDocument.load(templateBuf.slice(0));
   const finalDoc = await PDFDocument.create();
-  const font = await finalDoc.embedFont(StandardFonts.Helvetica);
+  const font     = await finalDoc.embedFont(StandardFonts.Helvetica);
+  const boldFont = await finalDoc.embedFont(StandardFonts.HelveticaBold);
 
-  // Copia tutte le pagine del template
   const allIdx = templateDoc.getPageIndices();
   const copiate = await finalDoc.copyPages(templateDoc, allIdx);
   copiate.forEach(p => finalDoc.addPage(p));
 
-  // Calcola delta: pageNum = pageIndex + delta
   const delta = structure.footerInfo
-    ? structure.footerInfo.pageNum - structure.footerInfo.foundOnIdx
-    : 1;
+    ? structure.footerInfo.pageNum - structure.footerInfo.foundOnIdx : 1;
 
-  // Ordina sezioni per posizione nel documento
   const sezioniOrdinati = SECTIONS.filter(k => structure.sections[k])
     .sort((a,b) => structure.sections[a].pageIndex - structure.sections[b].pageIndex);
 
-  // Offset cumulativo e mappa nuove pagine per sezione
-  const sectionFinalStart = {}; // { cap: pageIndex in final doc (0-based) }
+  const sectionFinalStart = {};
   let offset = 0;
+  const unusedBlanks = []; // pagine bianche rimaste vuote → da eliminare
 
+  // ── INSERIMENTO CONTENUTO ──
   for (const cap of sezioniOrdinati) {
     const origTitleIdx = structure.sections[cap].pageIndex;
     const finalTitleIdx = origTitleIdx + offset;
     sectionFinalStart[cap] = finalTitleIdx;
 
     const files = uploads[cap] || [];
-    if (files.length === 0) continue;
+    const existingBlanks = (structure.blankPagesPerSection[cap] || []).map(bi => bi + offset);
+
+    if (files.length === 0) {
+      unusedBlanks.push(...existingBlanks);
+      continue;
+    }
 
     const titlePage = finalDoc.getPages()[finalTitleIdx];
-    const pW = titlePage.getWidth();
-    const pH = titlePage.getHeight();
+    const pW = titlePage.getWidth(), pH = titlePage.getHeight();
     const cX = 40, cY = structure.footerHeight + 8;
     const cW = pW - 80, cH = pH - structure.headerHeight - structure.footerHeight - 16;
 
-    // Pagine bianche già presenti nel template dopo il titolo (indici nel finalDoc)
-    const existingBlanks = (structure.blankPagesPerSection[cap] || []).map(bi => bi + offset);
-    // Inserisci nuove pagine DOPO le pagine bianche esistenti
     let insertAt = existingBlanks.length > 0
-      ? existingBlanks[existingBlanks.length - 1] + 1
-      : finalTitleIdx + 1;
+      ? existingBlanks[existingBlanks.length - 1] + 1 : finalTitleIdx + 1;
     let blankUsed = 0;
 
     for (const file of files) {
@@ -676,49 +674,112 @@ async function assemblaPDF(templateBuf, uploads, structure, opts, valoriModulo) 
       for (const ep of embeddedPages) {
         let targetPage;
         if (blankUsed < existingBlanks.length) {
-          // Usa pagina bianca già esistente nel template
-          targetPage = finalDoc.getPages()[existingBlanks[blankUsed]];
-          blankUsed++;
+          targetPage = finalDoc.getPages()[existingBlanks[blankUsed++]];
         } else {
-          // Inserisci nuova pagina clonata dal titolo (mantiene header/footer MAAG)
           const [cloned] = await finalDoc.copyPages(templateDoc, [origTitleIdx]);
           finalDoc.insertPage(insertAt, cloned);
           targetPage = finalDoc.getPages()[insertAt];
           insertAt++; offset++;
         }
-        // Pulisci l'area contenuto (copre eventuali segnaposto del template)
-        targetPage.drawRectangle({ x: cX, y: cY, width: cW, height: cH,
-          color: PDFLib.rgb(1,1,1), borderWidth: 0 });
-        // Scala e disegna la pagina del documento caricato
+        targetPage.drawRectangle({ x: cX, y: cY, width: cW, height: cH, color: PDFLib.rgb(1,1,1), borderWidth: 0 });
         const aspect = ep.width / ep.height;
         let dw = cW, dh = dw / aspect;
         if (dh > cH) { dh = cH; dw = dh * aspect; }
-        targetPage.drawPage(ep, {
-          x: cX + (cW - dw) / 2, y: cY + (cH - dh) / 2, width: dw, height: dh });
+        targetPage.drawPage(ep, { x: cX+(cW-dw)/2, y: cY+(cH-dh)/2, width: dw, height: dh });
       }
+    }
+    for (let bi = blankUsed; bi < existingBlanks.length; bi++) unusedBlanks.push(existingBlanks[bi]);
+  }
+
+  // ── RIMOZIONE PAGINE BIANCHE NON USATE ──
+  // Prima della numerazione: rimuovi le pagine bianche rimaste vuote
+  let identFinalIdx = structure.identPageIndex;
+  unusedBlanks.sort((a,b) => b-a); // ordine decrescente per non spostare indici
+  for (const rmIdx of unusedBlanks) {
+    finalDoc.removePage(rmIdx);
+    for (const cap of SECTIONS) {
+      if (sectionFinalStart[cap] !== undefined && sectionFinalStart[cap] > rmIdx) sectionFinalStart[cap]--;
+    }
+    if (rmIdx < identFinalIdx) identFinalIdx--;
+  }
+
+  // ── RISCRITTURA PAGINA IDENTIFICATIVA ──
+  if (valoriModulo) {
+    // Usa una pagina bianca del template come base pulita (header/footer MAAG, body vuoto)
+    let blankTemplateIdx = null;
+    for (const bl of Object.values(structure.blankPagesPerSection)) {
+      if (bl.length > 0) { blankTemplateIdx = bl[0]; break; }
+    }
+    if (blankTemplateIdx !== null) {
+      const [cleanBase] = await finalDoc.copyPages(templateDoc, [blankTemplateIdx]);
+      finalDoc.removePage(identFinalIdx);
+      finalDoc.insertPage(identFinalIdx, cleanBase);
+    }
+
+    const idPage = finalDoc.getPages()[identFinalIdx];
+    const pageW = idPage.getWidth(), pageH = idPage.getHeight();
+    const hH = Math.max(structure.headerHeight, 52);
+    const fH = Math.max(structure.footerHeight, 42);
+    const bodyX = 44, bodyW = pageW - 88;
+    const bodyY = fH + 4, bodyH = pageH - hH - fH - 8;
+
+    // Cancella corpo con bianco piena larghezza
+    idPage.drawRectangle({ x: 0, y: bodyY, width: pageW, height: bodyH, color: PDFLib.rgb(1,1,1), borderWidth: 0 });
+
+    // Intestazione tabella
+    const topLineY = bodyY + bodyH - 5;
+    idPage.drawLine({ start: {x:bodyX, y:topLineY}, end: {x:bodyX+bodyW, y:topLineY},
+      thickness: 0.6, color: PDFLib.rgb(0.5,0.5,0.5) });
+
+    const labelW = 155, valX = bodyX + labelW + 4, valW = bodyW - labelW - 4;
+    const rowH = 24;
+    const grey = PDFLib.rgb(0.91, 0.91, 0.91);
+    let curY = topLineY - 2;
+
+    const ROWS = [
+      ['Manufacturer',            ['Costruttore', '_addr1', '_addr2']],
+      ["Manufacturer's order no.", ["Numero d'ordine del produttore"]],
+      ['Gear pump',               ['Tipo di pompa']],
+      ['Manual date of delivery', ['Data di consegna del manuale']],
+      ['Customer',                ['Cliente']],
+      ["Customer's purchase no.", ['Numero di ordine cliente']],
+      ['User',                    ['Utente']],
+      ['Installation site',       ['Luogo di installazione']],
+      ['Country',                 ['Paese']],
+      ['TAG number',              ['Numero TAG']],
+      ['Line',                    ['Linea']],
+    ];
+
+    for (const [label, keys] of ROWS) {
+      if (curY < bodyY + rowH) break;
+      const rH = rowH * keys.length;
+      idPage.drawRectangle({ x: valX, y: curY - rH + 2, width: valW, height: rH - 2, color: grey, borderWidth: 0 });
+      idPage.drawText(label, { x: bodyX + 4, y: curY - Math.ceil(rH/2) + 3, size: 8.5, font: boldFont, color: PDFLib.rgb(0.1,0.1,0.1) });
+      let vY = curY - 6;
+      for (const k of keys) {
+        const val = valoriModulo[k] || '';
+        if (val) idPage.drawText(val, { x: valX + 6, y: vY, size: 9, font, color: PDFLib.rgb(0,0,0) });
+        vY -= rowH;
+      }
+      idPage.drawLine({ start: {x:bodyX, y:curY-rH}, end: {x:bodyX+bodyW, y:curY-rH}, thickness: 0.25, color: PDFLib.rgb(0.75,0.75,0.75) });
+      curY -= rH;
     }
   }
 
   // ── AGGIORNAMENTO NUMERI PAGINA ──
-  // Usa margine destro FISSO (non dipende dal rilevamento fi.x che può essere impreciso)
   if (opts.updateNums && structure.footerInfo) {
     const fi = structure.footerInfo;
     const firstSecKey = sezioniOrdinati[0];
-    if (firstSecKey) {
-      const startIdx = structure.sections[firstSecKey].pageIndex;
+    if (firstSecKey && sectionFinalStart[firstSecKey] !== undefined) {
+      const startIdx = sectionFinalStart[firstSecKey];
       const pages = finalDoc.getPages();
-      const numY = fi.y; // usa Y rilevato (affidabile)
       for (let i = startIdx; i < pages.length; i++) {
         const pg = pages[i];
-        const pageW = pg.getWidth();
-        const newNum = i + delta;
-        const ns = String(newNum);
+        const pW2 = pg.getWidth();
+        const ns = String(i + delta);
         const tw = font.widthOfTextAtSize(ns, 10);
-        // Margine destro fisso: 22pt dal bordo della pagina — SEMPRE a destra
-        const numX = pageW - 22 - tw;
-        // Copre 80pt sul lato destro del footer: cancella il numero originale ovunque sia
-        pg.drawRectangle({ x: pageW - 105, y: numY - 1, width: 107, height: 12, color: bgColor, borderWidth: 0 });
-        pg.drawText(ns, { x: numX, y: numY + 1, size: 10, font, color: PDFLib.rgb(0,0,0) });
+        pg.drawRectangle({ x: pW2 - 105, y: fi.y - 1, width: 107, height: 12, color: bgColor, borderWidth: 0 });
+        pg.drawText(ns, { x: pW2 - 22 - tw, y: fi.y + 1, size: 10, font, color: PDFLib.rgb(0,0,0) });
       }
     }
   }
@@ -727,96 +788,18 @@ async function assemblaPDF(templateBuf, uploads, structure, opts, valoriModulo) 
   if (opts.updateToc && structure.tocPageIndices.length > 0) {
     const fi = structure.footerInfo;
     const pages = finalDoc.getPages();
-
     for (const cap of SECTIONS) {
       const entry = structure.tocEntries[cap];
-      const secInfo = structure.sections[cap];
-      if (!entry || !secInfo) continue;
-
-      const finalIdx = sectionFinalStart[cap] !== undefined
-        ? sectionFinalStart[cap]
-        : secInfo.pageIndex;
-
+      if (!entry || !structure.sections[cap]) continue;
+      const finalIdx = sectionFinalStart[cap] !== undefined ? sectionFinalStart[cap] : structure.sections[cap].pageIndex;
       const newPageNum = fi ? finalIdx + delta : entry.oldNum;
       if (newPageNum === entry.oldNum) continue;
-
       const tocPg = pages[entry.pageIndex];
       const ns = String(newPageNum);
       const tw = font.widthOfTextAtSize(ns, 10);
       const maxW = font.widthOfTextAtSize('999', 10) + 6;
-
-      // Rettangolo chirurgico sul vecchio numero (allineato a destra)
       tocPg.drawRectangle({ x: entry.numX - 2, y: entry.numY - 1, width: maxW, height: 11, color: bgColor, borderWidth: 0 });
-      // Nuovo numero allineato a destra (stessa posizione del vecchio)
       tocPg.drawText(ns, { x: entry.numX + (maxW - tw) - 2, y: entry.numY + 1, size: 10, font, color: PDFLib.rgb(0,0,0) });
-    }
-  }
-
-  // ── RISCRITTURA PAGINA IDENTIFICATIVA ──
-  // Cancella il contenuto esistente e ridisegna il form con i dati utente
-  if (valoriModulo) {
-    const boldFont = await finalDoc.embedFont(PDFLib.StandardFonts.HelveticaBold);
-    const pages = finalDoc.getPages();
-    const identIdx = Math.min(structure.identPageIndex, pages.length - 1);
-    const idPage = pages[identIdx];
-    const pageW = idPage.getWidth();
-    const pageH = idPage.getHeight();
-    const hH = Math.max(structure.headerHeight, 52);
-    const fH = Math.max(structure.footerHeight, 42);
-    const bodyX = 44, bodyW = pageW - 88;
-    const bodyY = fH + 4, bodyH = pageH - hH - fH - 8;
-
-    // Cancella corpo pagina (bianco)
-    idPage.drawRectangle({ x: bodyX - 4, y: bodyY, width: bodyW + 8, height: bodyH,
-      color: PDFLib.rgb(1,1,1), borderWidth: 0 });
-
-    // Titolo sezione
-    idPage.drawText('Identification', { x: bodyX, y: bodyY + bodyH - 18,
-      size: 12, font: boldFont, color: PDFLib.rgb(0,0,0) });
-    const titleLineY = bodyY + bodyH - 24;
-    idPage.drawLine({ start: {x: bodyX, y: titleLineY}, end: {x: bodyX + bodyW, y: titleLineY},
-      thickness: 0.7, color: PDFLib.rgb(0.4,0.4,0.4) });
-
-    const labelW = 155, valX = bodyX + labelW + 5, valW = bodyW - labelW - 5;
-    const rowH = 22;
-    const grey = PDFLib.rgb(0.91,0.91,0.91);
-
-    // Righe del form: [etichetta, chiavi in valoriModulo, numero righe riservate]
-    const ROWS = [
-      ['Manufacturer / Costruttore', ['Costruttore', '_addr1', '_addr2'], 3],
-      ["Mfr's order number",         ["Numero d'ordine del produttore"],  1],
-      ['Gear pump / Pump type',       ['Tipo di pompa'],                   1],
-      ['Manual date of delivery',     ['Data di consegna del manuale'],    1],
-      ['Customer / Cliente',          ['Cliente'],                         1],
-      ["Customer's purchase number",  ['Numero di ordine cliente'],        1],
-      ['User / Utente',               ['Utente'],                          1],
-      ['Installation site / Luogo',   ['Luogo di installazione'],          1],
-      ['Country / Paese',             ['Paese'],                           1],
-      ['TAG number / Numero TAG',     ['Numero TAG'],                      1],
-      ['Line / Linea',                ['Linea'],                           1],
-    ];
-
-    let curY = titleLineY - 4;
-    for (const [label, keys, nLines] of ROWS) {
-      if (curY < bodyY + rowH) break;
-      const rH = rowH * nLines;
-      // Sfondo grigio cella valore
-      idPage.drawRectangle({ x: valX, y: curY - rH + 2, width: valW, height: rH - 2,
-        color: grey, borderWidth: 0 });
-      // Testo etichetta (centrato verticalmente)
-      idPage.drawText(label + ':', { x: bodyX + 2, y: curY - Math.ceil(rH/2) + 2,
-        size: 7.5, font, color: PDFLib.rgb(0.25,0.25,0.25) });
-      // Valori
-      let vY = curY - 4;
-      for (const k of keys) {
-        const val = valoriModulo[k] || '';
-        if (val) idPage.drawText(val, { x: valX + 5, y: vY, size: 9, font, color: PDFLib.rgb(0,0,0) });
-        vY -= rowH;
-      }
-      // Linea separatore
-      idPage.drawLine({ start: {x: bodyX, y: curY - rH}, end: {x: bodyX + bodyW, y: curY - rH},
-        thickness: 0.25, color: PDFLib.rgb(0.75,0.75,0.75) });
-      curY -= rH;
     }
   }
 
