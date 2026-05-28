@@ -366,6 +366,16 @@ input[type="file"]::-webkit-file-upload-button:hover { background: #e4e4e7; }
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
       Avvia Compilazione Intelligente
     </button>
+
+    <a id="openPdfBtn" href="#" download
+       style="display:none; align-items:center; justify-content:center; gap:10px;
+              padding:13px; border-radius:14px; border:2px solid #10b981;
+              background:rgba(16,185,129,0.1); color:#10b981;
+              font-family:'Outfit',sans-serif; font-size:14px; font-weight:700;
+              text-transform:uppercase; letter-spacing:1px; text-decoration:none;
+              box-shadow:0 6px 20px rgba(16,185,129,0.2); width:100%;">
+      &#8681; Apri / Salva PDF compilato
+    </a>
   </div>
 
 </main>
@@ -468,7 +478,7 @@ async function analizzaTemplate(buffer) {
         const txt = it.str.trim();
         if (y < 65 && y > 5 && /^\d{1,4}$/.test(txt) && parseInt(txt) > 0) {
           // prendi il numero con x più alto (più a destra)
-          if (!best || x > best.x) best = { x, y, pageNum: parseInt(txt), foundOnIdx: pIdx, pageHeight: vp.height, pageWidth: vp.width };
+          if (!best || x > best.x) best = { x, y, w: it.width || 0, pageNum: parseInt(txt), foundOnIdx: pIdx, pageHeight: vp.height, pageWidth: vp.width };
         }
       }
       if (best) {
@@ -645,17 +655,18 @@ async function assemblaPDF(templateBuf, uploads, structure, opts, valoriModulo) 
     if (firstSecKey) {
       const startIdx = structure.sections[firstSecKey].pageIndex;
       const pages = finalDoc.getPages();
+      // Bordo destro del numero originale — usato per allineamento a destra
+      const origNumW = fi.w > 2 ? fi.w : Math.max(font.widthOfTextAtSize(String(fi.pageNum), 10), 14);
+      const fiRight = fi.x + origNumW + 2;
       for (let i = startIdx; i < pages.length; i++) {
         const pg = pages[i];
         const newNum = i + delta;
         const ns = String(newNum);
         const tw = font.widthOfTextAtSize(ns, 10);
-        // Rettangolo chirurgico: copre solo i digit del vecchio numero senza toccare la riga blu sopra
-        const rectW = Math.max(tw, font.widthOfTextAtSize('999', 10)) + 6;
-        const rectH = 11; // altezza minima — non sale verso la riga blu
-        pg.drawRectangle({ x: fi.x - 2, y: fi.y - 1, width: rectW, height: rectH, color: bgColor, borderWidth: 0 });
-        // Numero allineato a sinistra della stessa posizione originale
-        pg.drawText(ns, { x: fi.x, y: fi.y + 1, size: 10, font, color: PDFLib.rgb(0,0,0) });
+        // Rettangolo largo 40pt a sinistra del bordo destro: copre qualsiasi numero 1-4 cifre
+        pg.drawRectangle({ x: fiRight - 40, y: fi.y - 1, width: 42, height: 12, color: bgColor, borderWidth: 0 });
+        // Numero allineato a DESTRA rispetto al bordo destro originale
+        pg.drawText(ns, { x: fiRight - tw - 1, y: fi.y + 1, size: 10, font, color: PDFLib.rgb(0,0,0) });
       }
     }
   }
@@ -697,8 +708,11 @@ async function assemblaPDF(templateBuf, uploads, structure, opts, valoriModulo) 
       if (!valore || !pos) continue;
       const page = pages[pos.pageIndex];
       const sz = Math.max(8, Math.min(pos.fontSize || 10, 11));
-      // Posizione: subito dopo la fine del testo dell'etichetta + gap
-      const valX = pos.x + pos.itemWidth + 8;
+      // Larghezza effettiva: usa it.width se disponibile, altrimenti stima da fontSize e lunghezza testo
+      const effectiveW = pos.itemWidth > 5
+        ? pos.itemWidth
+        : (pos.fontSize || 10) * 0.58 * etichetta.length;
+      const valX = pos.x + effectiveW + 12;
       page.drawText(valore, { x: valX, y: pos.y + 1, size: sz, font, color: PDFLib.rgb(0,0,0) });
     }
   }
@@ -822,12 +836,43 @@ async function avviaCompilazione() {
 
     const pdfBytes = await assemblaPDF(templateBuf, uploads, structure, opts, valoriModulo);
 
-    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
     const dt = new Date().toISOString().slice(0,10);
-    link.download = `MANUALE_MAAG_COMPILATO_${dt}.pdf`;
-    link.click();
+    const filename = `MANUALE_MAAG_COMPILATO_${dt}.pdf`;
+    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+    const blobUrl = URL.createObjectURL(blob);
+
+    // Mostra pulsante persistente (utile su Android/mobile)
+    const openBtn = document.getElementById('openPdfBtn');
+    if (openBtn) {
+      openBtn.href = blobUrl;
+      openBtn.download = filename;
+      openBtn.style.display = 'flex';
+    }
+
+    // Prova Web Share API (Android, iOS) — funziona senza popup bloccati
+    let sharedViaApi = false;
+    if (typeof navigator.share === 'function') {
+      try {
+        const shareFile = new File([pdfBytes], filename, { type: 'application/pdf' });
+        const canShare = navigator.canShare ? navigator.canShare({ files: [shareFile] }) : false;
+        if (canShare) {
+          await navigator.share({ files: [shareFile], title: 'Manuale MAAG Compilato' });
+          sharedViaApi = true;
+        }
+      } catch(e) {
+        if (e.name === 'AbortError') sharedViaApi = true; // utente ha chiuso il pannello
+      }
+    }
+
+    // Fallback: download standard
+    if (!sharedViaApi) {
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
 
     const dettaglio = foundSections.map(k => {
       const n = (uploads[k]||[]).length;
