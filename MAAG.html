@@ -474,8 +474,8 @@ async function analizzaTemplate(buffer) {
       }
     }
 
-    // Rileva se la pagina ha contenuto nel body (non solo header/footer)
-    const bodyItems = items.filter(it => it.transform[5] > 60 && it.transform[5] < vp.height - 50 && it.str.trim().length > 0);
+    // Rileva se la pagina ha contenuto nel body (esclude header top 75pt e footer bottom 55pt)
+    const bodyItems = items.filter(it => it.transform[5] > 55 && it.transform[5] < vp.height - 75 && it.str.trim().length > 0);
     _bodyContentMap[pIdx] = bodyItems.length > 0;
 
     // Numero pagina nel footer — scansiona TUTTE le pagine post-TOC e prende il numero più a DESTRA in assoluto
@@ -609,6 +609,7 @@ async function analizzaTemplate(buffer) {
             result.tocEntries[cap] = {
               pageIndex: tocIdx,
               numX: rightmost.transform[4],
+              numXRight: rightmost.transform[4] + (rightmost.width || 0), // bordo destro per allineamento
               numY: rightmost.transform[5],
               oldNum: parseInt(rightmost.str.trim()),
             };
@@ -825,9 +826,11 @@ async function assemblaPDF(templateBuf, uploads, structure, opts, valoriModulo) 
       const tocPg = pages[entry.pageIndex];
       const ns = String(newPageNum);
       const tw = font.widthOfTextAtSize(ns, 10);
-      const maxW = font.widthOfTextAtSize('999', 10) + 6;
-      tocPg.drawRectangle({ x: entry.numX - 2, y: entry.numY - 1, width: maxW, height: 11, color: bgColor, borderWidth: 0 });
-      tocPg.drawText(ns, { x: entry.numX + (maxW - tw) - 2, y: entry.numY + 1, size: 10, font, color: PDFLib.rgb(0,0,0) });
+      // Allinea a destra: il bordo destro del nuovo numero coincide con quello dell'originale
+      const rx = entry.numXRight || (entry.numX + font.widthOfTextAtSize(String(entry.oldNum), 10) + 2);
+      const eraseW = Math.max(tw, font.widthOfTextAtSize('999', 10)) + 8;
+      tocPg.drawRectangle({ x: rx - eraseW, y: entry.numY - 2, width: eraseW + 2, height: 12, color: bgColor, borderWidth: 0 });
+      tocPg.drawText(ns, { x: rx - tw, y: entry.numY + 1, size: 10, font, color: PDFLib.rgb(0,0,0) });
     }
   }
 
