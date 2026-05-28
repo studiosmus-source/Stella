@@ -508,6 +508,12 @@ async function analizzaTemplate(buffer) {
     result.blankPagesPerSection[cap] = blanks;
   }
 
+  // ── TUTTE le pagine vuote del template (da rimuovere se non usate) ──
+  result.allBlankPageIndices = Object.entries(_bodyContentMap)
+    .filter(([, v]) => v === false)
+    .map(([k]) => parseInt(k))
+    .sort((a, b) => a - b);
+
   // ── rilevamento posizioni campi modulo (prime 10 pagine) ──
   // Usa keyword matching flessibile: funziona con abbreviazioni, N°, varianti linguistiche
   const FIELD_MATCHERS = [
@@ -640,7 +646,9 @@ async function assemblaPDF(templateBuf, uploads, structure, opts, valoriModulo) 
 
   const sectionFinalStart = {};
   let offset = 0;
-  const unusedBlanks = []; // pagine bianche rimaste vuote → da eliminare
+  // Track ALL originally-blank pages in the final doc (shift indices as we insert pages)
+  let blankFinalSet = new Set(structure.allBlankPageIndices || []);
+  const filledFinalSet = new Set(); // blank pages that received content
 
   // ── INSERIMENTO CONTENUTO ──
   for (const cap of sezioniOrdinati) {
@@ -651,10 +659,7 @@ async function assemblaPDF(templateBuf, uploads, structure, opts, valoriModulo) 
     const files = uploads[cap] || [];
     const existingBlanks = (structure.blankPagesPerSection[cap] || []).map(bi => bi + offset);
 
-    if (files.length === 0) {
-      unusedBlanks.push(...existingBlanks);
-      continue;
-    }
+    if (files.length === 0) continue;
 
     const titlePage = finalDoc.getPages()[finalTitleIdx];
     const pW = titlePage.getWidth(), pH = titlePage.getHeight();
@@ -674,28 +679,44 @@ async function assemblaPDF(templateBuf, uploads, structure, opts, valoriModulo) 
       for (const ep of embeddedPages) {
         let targetPage;
         if (blankUsed < existingBlanks.length) {
-          targetPage = finalDoc.getPages()[existingBlanks[blankUsed++]];
+          const usedIdx = existingBlanks[blankUsed++];
+          filledFinalSet.add(usedIdx);
+          targetPage = finalDoc.getPages()[usedIdx];
         } else {
           const [cloned] = await finalDoc.copyPages(templateDoc, [origTitleIdx]);
           finalDoc.insertPage(insertAt, cloned);
+          // Shift all tracked blank indices that are >= insertAt
+          blankFinalSet = new Set([...blankFinalSet].map(i => i >= insertAt ? i + 1 : i));
+          const newFilled = new Set([...filledFinalSet].map(i => i >= insertAt ? i + 1 : i));
+          filledFinalSet.clear(); newFilled.forEach(i => filledFinalSet.add(i));
           targetPage = finalDoc.getPages()[insertAt];
           insertAt++; offset++;
         }
         targetPage.drawRectangle({ x: cX, y: cY, width: cW, height: cH, color: PDFLib.rgb(1,1,1), borderWidth: 0 });
-        const aspect = ep.width / ep.height;
-        let dw = cW, dh = dw / aspect;
-        if (dh > cH) { dh = cH; dw = dh * aspect; }
-        targetPage.drawPage(ep, { x: cX+(cW-dw)/2, y: cY+(cH-dh)/2, width: dw, height: dh });
+        const isLandscape = ep.width > ep.height * 1.1;
+        if (isLandscape) {
+          // Rotate 90° CCW so landscape fills the portrait frame
+          const s = Math.min(cW / ep.height, cH / ep.width);
+          const dw = ep.height * s; // displayed width after rotation
+          const dh = ep.width * s;  // displayed height after rotation
+          const ax = cX + (cW + dw) / 2;
+          const ay = cY + (cH - dh) / 2;
+          targetPage.drawPage(ep, { x: ax, y: ay, width: ep.width * s, height: ep.height * s, rotate: PDFLib.degrees(90) });
+        } else {
+          const aspect = ep.width / ep.height;
+          let dw = cW, dh = dw / aspect;
+          if (dh > cH) { dh = cH; dw = dh * aspect; }
+          targetPage.drawPage(ep, { x: cX + (cW - dw) / 2, y: cY + (cH - dh) / 2, width: dw, height: dh });
+        }
       }
     }
-    for (let bi = blankUsed; bi < existingBlanks.length; bi++) unusedBlanks.push(existingBlanks[bi]);
   }
 
-  // ── RIMOZIONE PAGINE BIANCHE NON USATE ──
-  // Prima della numerazione: rimuovi le pagine bianche rimaste vuote
+  // ── RIMOZIONE TUTTE LE PAGINE BIANCHE NON USATE ──
+  // Rimuove sia le pagine bianche pre-allocate non usate sia le "annex" e altri blank sparsi
   let identFinalIdx = structure.identPageIndex;
-  unusedBlanks.sort((a,b) => b-a); // ordine decrescente per non spostare indici
-  for (const rmIdx of unusedBlanks) {
+  const toRemoveBlanks = [...blankFinalSet].filter(i => !filledFinalSet.has(i)).sort((a, b) => b - a);
+  for (const rmIdx of toRemoveBlanks) {
     finalDoc.removePage(rmIdx);
     for (const cap of SECTIONS) {
       if (sectionFinalStart[cap] !== undefined && sectionFinalStart[cap] > rmIdx) sectionFinalStart[cap]--;
