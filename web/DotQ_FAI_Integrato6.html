@@ -185,8 +185,11 @@ body{
 
 /* ── ANAGRAFICA FAI (sidebar) ── */
 .ana-box{background:rgba(45,106,79,.05);border:1px solid rgba(45,106,79,.20);border-radius:5px;padding:7px 9px;margin:2px 0 4px;display:flex;flex-direction:column;gap:5px}
-.ana-title{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:var(--green);font-weight:600;display:flex;align-items:center;justify-content:space-between}
+.ana-title{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:var(--green);font-weight:600;display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none}
 .ana-title .ana-status{font-size:8px;color:var(--ink2);font-weight:400;letter-spacing:.3px;text-transform:none;font-style:italic}
+.ana-title .ana-toggle{font-size:11px;color:var(--green);opacity:.7;transition:transform .2s;flex-shrink:0;margin-left:4px}
+.ana-box.collapsed .ana-toggle{transform:rotate(-90deg)}
+.ana-box.collapsed .ana-row{display:none}
 .ana-row{display:flex;align-items:center;gap:5px}
 .ana-lbl{font-family:'DM Mono',monospace;font-size:9px;color:var(--ink2);min-width:56px;letter-spacing:.3px;flex-shrink:0}
 .ana-inp{flex:1;font-family:'DM Mono',monospace;font-size:11px;border:1px solid var(--border);border-radius:3px;padding:3px 6px;background:#fff;color:var(--ink);outline:none;min-width:0}
@@ -443,10 +446,11 @@ body{
         </button>
 
         <!-- ANAGRAFICA FAI -->
-        <div class="ana-box">
-          <div class="ana-title">
+        <div class="ana-box collapsed" id="ana-box">
+          <div class="ana-title" id="ana-box-toggle">
             <span>Anagrafica FAI</span>
             <span class="ana-status" id="ana-status">—</span>
+            <span class="ana-toggle">▾</span>
           </div>
           <div class="ana-row">
             <span class="ana-lbl">ODP</span>
@@ -2349,6 +2353,12 @@ async function exportPDF(mode){
 document.getElementById('btn-export-all')?.addEventListener('click',()=>exportPDF('all'));
 document.getElementById('btn-export-draw')?.addEventListener('click',()=>exportPDF('drawing'));
 document.getElementById('btn-export-rep')?.addEventListener('click',()=>exportPDF('report'));
+
+// ── TOGGLE ANAGRAFICA SIDEBAR ──
+document.getElementById('ana-box-toggle')?.addEventListener('click',()=>{
+  const box=document.getElementById('ana-box');
+  if(box)box.classList.toggle('collapsed');
+});
 
 // ── HOOK ANAGRAFICA → auto-save ──
 ['ana-odp','ana-sap','ana-ndis','ana-op','ana-data',
