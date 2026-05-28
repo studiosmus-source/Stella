@@ -333,9 +333,11 @@ input[type="file"]::-webkit-file-upload-button:hover { background: #e4e4e7; }
 // ─────────────────────────────────────────────
 //  INIT
 // ─────────────────────────────────────────────
-window.addEventListener('load', () => {
-  setTimeout(() => document.getElementById('splash-screen').classList.add('hidden'), 2600);
-});
+// Rimuove lo splash indipendentemente dal caricamento delle librerie CDN
+setTimeout(() => {
+  const s = document.getElementById('splash-screen');
+  if (s) s.classList.add('hidden');
+}, 2600);
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 const pad = n => String(n).padStart(2, '0');
 function tick() {
