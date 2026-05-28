@@ -475,8 +475,10 @@ async function analizzaTemplate(buffer) {
     }
 
     // Rileva se la pagina ha contenuto nel body (esclude header top 75pt e footer bottom 55pt)
+    // Soglia 30 caratteri: pagine con solo titolo/numero capitolo ("Annex", "14.7" ecc.) → blank
     const bodyItems = items.filter(it => it.transform[5] > 55 && it.transform[5] < vp.height - 75 && it.str.trim().length > 0);
-    _bodyContentMap[pIdx] = bodyItems.length > 0;
+    const bodyCharCount = bodyItems.reduce((n, it) => n + it.str.trim().length, 0);
+    _bodyContentMap[pIdx] = bodyCharCount > 30;
 
     // Numero pagina nel footer — scansiona TUTTE le pagine post-TOC e prende il numero più a DESTRA in assoluto
     if (p > (result.tocPageIndices.length > 0 ? result.tocPageIndices[result.tocPageIndices.length-1]+2 : 5)) {
@@ -493,6 +495,10 @@ async function analizzaTemplate(buffer) {
       if (pageBest && (!result.footerInfo || pageBest.x > result.footerInfo.x)) {
         result.footerInfo = pageBest;
         result.footerHeight = Math.max(35, Math.round(pageBest.y) + 12);
+        // Salva TUTTE le posizioni numeriche nel footer di questa pagina (destra E sinistra)
+        result.footerAllNums = items
+          .filter(it => it.transform[5] < 110 && it.transform[5] > 3 && /^\d{1,4}$/.test(it.str.trim()) && parseInt(it.str.trim()) > 0)
+          .map(it => ({ x: it.transform[4], y: it.transform[5], w: it.width || 0 }));
       }
     }
   }
@@ -722,8 +728,15 @@ async function assemblaPDF(templateBuf, uploads, structure, opts, valoriModulo) 
 
   // ── RIMOZIONE TUTTE LE PAGINE BIANCHE NON USATE ──
   // Rimuove sia le pagine bianche pre-allocate non usate sia le "annex" e altri blank sparsi
+  // Protegge pagine di titolo sezione e pagina identificativa (non rimuoverle anche se brevi)
   let identFinalIdx = structure.identPageIndex;
-  const toRemoveBlanks = [...blankFinalSet].filter(i => !filledFinalSet.has(i)).sort((a, b) => b - a);
+  const protectedPages = new Set([
+    identFinalIdx,
+    ...SECTIONS.filter(k => sectionFinalStart[k] !== undefined).map(k => sectionFinalStart[k]),
+  ]);
+  const toRemoveBlanks = [...blankFinalSet]
+    .filter(i => !filledFinalSet.has(i) && !protectedPages.has(i))
+    .sort((a, b) => b - a);
   for (const rmIdx of toRemoveBlanks) {
     finalDoc.removePage(rmIdx);
     for (const cap of SECTIONS) {
@@ -807,6 +820,13 @@ async function assemblaPDF(templateBuf, uploads, structure, opts, valoriModulo) 
         const pW2 = pg.getWidth();
         const ns = String(i + delta);
         const tw = font.widthOfTextAtSize(ns, 10);
+        // Cancella TUTTI i numeri del footer rilevati (sinistra E destra)
+        if (structure.footerAllNums) {
+          for (const fn of structure.footerAllNums) {
+            pg.drawRectangle({ x: fn.x - 2, y: fi.y - 1, width: (fn.w || 20) + 8, height: 12, color: bgColor, borderWidth: 0 });
+          }
+        }
+        // Copre sempre anche la zona destra (105pt) per sicurezza
         pg.drawRectangle({ x: pW2 - 105, y: fi.y - 1, width: 107, height: 12, color: bgColor, borderWidth: 0 });
         pg.drawText(ns, { x: pW2 - 22 - tw, y: fi.y + 1, size: 10, font, color: PDFLib.rgb(0,0,0) });
       }
