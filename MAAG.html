@@ -219,6 +219,20 @@ input[type="file"]::-webkit-file-upload-button:hover { background: #e4e4e7; }
 @keyframes subReveal { 0% { opacity: 0; clip-path: inset(0 100% 0 0); } 100% { opacity: 1; clip-path: inset(0 0 0 0); } }
 @keyframes glowPulse { 0% { transform: scale(0.8); opacity: 0.3; } 100% { transform: scale(1.2); opacity: 0.8; } }
 @media (max-width: 900px) { .container { grid-template-columns: 1fr; } .left-col { position: static; } }
+.cs-item {
+  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px; padding: 12px; margin-bottom: 10px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.cs-item input[type="text"], .cs-item select {
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px; padding: 8px 12px; color: var(--text-primary);
+  font-family: 'Inter', sans-serif; font-size: 13px; width: 100%;
+}
+.cs-item input[type="file"] { color: var(--text-muted); font-size: 12px; }
+.cs-remove { align-self: flex-end; padding: 4px 12px; background: rgba(239,68,68,0.15);
+  border: 1px solid rgba(239,68,68,0.3); border-radius: 8px; color: #f87171;
+  font-size: 12px; cursor: pointer; font-family: 'Inter', sans-serif; }
 </style>
 </head>
 <body>
@@ -341,27 +355,15 @@ input[type="file"]::-webkit-file-upload-button:hover { background: #e4e4e7; }
 
     <div class="section-divider"></div>
 
-    <div class="footer-options">
-      <div class="opt-row">
-        <label>
-          <input type="checkbox" id="opt_update_nums" checked>
-          Aggiorna numerazione pagine nel piè di pagina
-        </label>
+    <!-- ── SEZIONI PERSONALIZZATE ── -->
+    <div class="form-group">
+      <div class="form-label">
+        <span class="lbl-main">Sezioni Personalizzate</span>
+        <span class="lbl-badge">OPZIONALE</span>
       </div>
-      <div class="opt-row">
-        <label>
-          <input type="checkbox" id="opt_update_toc" checked>
-          Aggiorna indice (TOC) con nuove pagine
-        </label>
-      </div>
-      <div class="opt-row">
-        <label style="gap:6px;">
-          <input type="checkbox" id="opt_footer_bg" checked>
-          Sfondo piè di pagina:
-        </label>
-        <input type="color" id="opt_footer_color" value="#ffffff" title="Colore sfondo copertura numero pagina" style="width:32px;height:24px;border:none;background:none;cursor:pointer;border-radius:6px;">
-        <span style="font-size:11px;color:var(--text-muted);">(colore copertura)</span>
-      </div>
+      <p style="font-size:12px;color:var(--text-muted);margin:0 0 10px;">Aggiungi pagine extra (report test, certificati aggiuntivi…) in qualsiasi posizione. Header e footer MAAG mantenuti, numerazione e indice aggiornati automaticamente.</p>
+      <div id="customSectionsList"></div>
+      <button type="button" onclick="addCustomSection()" style="margin-top:8px;padding:9px 16px;background:rgba(212,175,55,0.12);border:1px solid rgba(212,175,55,0.4);border-radius:10px;color:var(--gold-primary);font-family:'Outfit',sans-serif;font-size:13px;font-weight:600;cursor:pointer;width:100%;letter-spacing:0.5px;">＋ Aggiungi sezione personalizzata</button>
     </div>
 
     <button class="ut-btn" id="mainBtn" onclick="avviaCompilazione()">
@@ -503,14 +505,16 @@ async function analizzaTemplate(buffer) {
     }
   }
 
-  // ── pagine bianche disponibili dopo ogni sezione ──
+  // ── pagine disponibili dopo ogni sezione: TUTTE fino alla sezione successiva ──
+  // Non dipende dalla rilevazione testo — garantisce inserimento dalla prima pagina disponibile
+  const allSectionPageIndices = SECTIONS
+    .map(k => result.sections[k]?.pageIndex).filter(i => i !== undefined).sort((a,b) => a-b);
   for (const cap of SECTIONS) {
     if (!result.sections[cap]) continue;
     const titleIdx = result.sections[cap].pageIndex;
+    const nextIdx = allSectionPageIndices.find(i => i > titleIdx) ?? nPag;
     const blanks = [];
-    for (let bi = titleIdx + 1; bi < nPag; bi++) {
-      if (_bodyContentMap[bi] === false) { blanks.push(bi); } else { break; }
-    }
+    for (let bi = titleIdx + 1; bi < nextIdx; bi++) blanks.push(bi);
     result.blankPagesPerSection[cap] = blanks;
   }
 
@@ -632,7 +636,7 @@ async function analizzaTemplate(buffer) {
 // ─────────────────────────────────────────────
 //  ASSEMBLAGGIO (pdf-lib)
 // ─────────────────────────────────────────────
-async function assemblaPDF(templateBuf, uploads, structure, opts, valoriModulo) {
+async function assemblaPDF(templateBuf, uploads, structure, opts, valoriModulo, customSections = []) {
   const { PDFDocument, StandardFonts } = PDFLib;
   const bgColor = hexToRgb(opts.footerBgColor);
 
@@ -747,11 +751,6 @@ async function assemblaPDF(templateBuf, uploads, structure, opts, valoriModulo) 
 
   // ── RISCRITTURA PAGINA IDENTIFICATIVA ──
   if (valoriModulo) {
-    // Usa una pagina bianca del template come base pulita (header/footer MAAG, body vuoto)
-    let blankTemplateIdx = null;
-    for (const bl of Object.values(structure.blankPagesPerSection)) {
-      if (bl.length > 0) { blankTemplateIdx = bl[0]; break; }
-    }
     if (blankTemplateIdx !== null) {
       const [cleanBase] = await finalDoc.copyPages(templateDoc, [blankTemplateIdx]);
       finalDoc.removePage(identFinalIdx);
@@ -808,6 +807,51 @@ async function assemblaPDF(templateBuf, uploads, structure, opts, valoriModulo) 
     }
   }
 
+  // ── INSERIMENTO SEZIONI PERSONALIZZATE ──
+  for (const cs of customSections) {
+    if (!cs.files || cs.files.length === 0) continue;
+    // Trova punto di inserimento: prima della sezione successiva a cs.after, o fine doc
+    const afterIdx = sezioniOrdinati.indexOf(cs.after);
+    const nextCap = sezioniOrdinati[afterIdx + 1];
+    let insertAt = (nextCap && sectionFinalStart[nextCap] !== undefined)
+      ? sectionFinalStart[nextCap]
+      : finalDoc.getPageCount();
+    const refPg = finalDoc.getPages()[Math.max(0, insertAt - 1)];
+    const rpW = refPg.getWidth(), rpH = refPg.getHeight();
+    const csX = 40, csY = structure.footerHeight + 8;
+    const csW = rpW - 80, csH = rpH - structure.headerHeight - structure.footerHeight - 16;
+    for (const file of cs.files) {
+      const buf = await leggiBuffer(file);
+      let embeddedPages;
+      try { embeddedPages = await finalDoc.embedPdf(buf); }
+      catch(e) { console.warn(`CS: ${file.name}:`, e.message); continue; }
+      for (const ep of embeddedPages) {
+        const srcIdx = blankTemplateIdx !== null ? blankTemplateIdx : 0;
+        const [cloned] = await finalDoc.copyPages(templateDoc, [srcIdx]);
+        finalDoc.insertPage(insertAt, cloned);
+        const tp = finalDoc.getPages()[insertAt];
+        tp.drawRectangle({ x: csX, y: csY, width: csW, height: csH, color: PDFLib.rgb(1,1,1), borderWidth: 0 });
+        const isLs = ep.width > ep.height * 1.1;
+        if (isLs) {
+          const s = Math.min(csW / ep.height, csH / ep.width);
+          const dw = ep.height * s, dh = ep.width * s;
+          tp.drawPage(ep, { x: csX+(csW+dw)/2, y: csY+(csH-dh)/2, width: ep.width*s, height: ep.height*s, rotate: PDFLib.degrees(90) });
+        } else {
+          const asp = ep.width / ep.height;
+          let dw = csW, dh = dw / asp;
+          if (dh > csH) { dh = csH; dw = dh * asp; }
+          tp.drawPage(ep, { x: csX+(csW-dw)/2, y: csY+(csH-dh)/2, width: dw, height: dh });
+        }
+        // Aggiorna indici per le sezioni che vengono dopo
+        for (const cap of SECTIONS) {
+          if (sectionFinalStart[cap] !== undefined && sectionFinalStart[cap] >= insertAt) sectionFinalStart[cap]++;
+        }
+        if (identFinalIdx >= insertAt) identFinalIdx++;
+        insertAt++;
+      }
+    }
+  }
+
   // ── AGGIORNAMENTO NUMERI PAGINA ──
   if (opts.updateNums && structure.footerInfo) {
     const fi = structure.footerInfo;
@@ -855,6 +899,31 @@ async function assemblaPDF(templateBuf, uploads, structure, opts, valoriModulo) 
   }
 
   return await finalDoc.save();
+}
+
+// ─────────────────────────────────────────────
+//  SEZIONI PERSONALIZZATE
+// ─────────────────────────────────────────────
+let _csCounter = 0;
+function addCustomSection() {
+  const n = _csCounter++;
+  const div = document.createElement('div');
+  div.className = 'cs-item';
+  div.id = 'cs_' + n;
+  div.dataset.csid = n;
+  div.innerHTML = `
+    <input type="text" id="cs_${n}_title" placeholder="Titolo sezione (es. Test Reports, Certificati…)">
+    <select id="cs_${n}_after">
+      <option value="end">Alla fine del documento</option>
+      <option value="14.7">Dopo cap. 14.7 — Data Sheet</option>
+      <option value="14.8">Dopo cap. 14.8 — Drawings</option>
+      <option value="14.9">Dopo cap. 14.9 — Parts Lists</option>
+      <option value="14.10">Dopo cap. 14.10 — CE Declaration</option>
+    </select>
+    <input type="file" id="cs_${n}_files" accept=".pdf" multiple>
+    <button type="button" class="cs-remove" onclick="document.getElementById('cs_${n}').remove()">✕ Rimuovi</button>
+  `;
+  document.getElementById('customSectionsList').appendChild(div);
 }
 
 // ─────────────────────────────────────────────
@@ -949,11 +1018,7 @@ async function avviaCompilazione() {
     const totalFiles = SECTIONS.reduce((s,k) => s + (uploads[k]||[]).length, 0);
     stato('loading', 'Assemblaggio PDF...', `${foundSections.length} capitoli · ${totalFiles} file da inserire...`, '⚙️');
 
-    const opts = {
-      updateNums: document.getElementById('opt_update_nums').checked,
-      updateToc: document.getElementById('opt_update_toc').checked,
-      footerBgColor: document.getElementById('opt_footer_color').value,
-    };
+    const opts = { updateNums: true, updateToc: true, footerBgColor: '#ffffff' };
 
     const fmt = v => document.getElementById(v)?.value.trim() || '';
     const rawData = document.getElementById('d_data_consegna').value;
@@ -974,7 +1039,17 @@ async function avviaCompilazione() {
       "Linea": fmt('d_linea'),
     };
 
-    const pdfBytes = await assemblaPDF(templateBuf, uploads, structure, opts, valoriModulo);
+    // Raccoglie sezioni personalizzate
+    const customSections = [];
+    document.querySelectorAll('.cs-item').forEach(item => {
+      const n = item.dataset.csid;
+      const title = document.getElementById('cs_' + n + '_title')?.value.trim() || 'Sezione';
+      const after = document.getElementById('cs_' + n + '_after')?.value || 'end';
+      const files = Array.from(document.getElementById('cs_' + n + '_files')?.files || []);
+      if (files.length > 0) customSections.push({ title, after, files });
+    });
+
+    const pdfBytes = await assemblaPDF(templateBuf, uploads, structure, opts, valoriModulo, customSections);
 
     const dt = new Date().toISOString().slice(0,10);
     const filename = `MANUALE_MAAG_COMPILATO_${dt}.pdf`;
@@ -1019,9 +1094,10 @@ async function avviaCompilazione() {
       return n > 0 ? `${k}(${n}f)` : null;
     }).filter(Boolean).join(' · ');
 
+    const csNote = customSections.length > 0 ? ` · ${customSections.length} sez. extra` : '';
     stato('ok', 'Compilazione completata!', `Download avviato · ${dettaglio}` +
-      (opts.updateNums && structure.footerInfo ? ' · Numerazione aggiornata' : '') +
-      (opts.updateToc && structure.tocPageIndices.length > 0 ? ' · Indice aggiornato' : ''), '✓');
+      (structure.footerInfo ? ' · Numerazione aggiornata' : '') +
+      (structure.tocPageIndices.length > 0 ? ' · Indice aggiornato' : '') + csNote, '✓');
 
   } catch(e) {
     console.error(e);
