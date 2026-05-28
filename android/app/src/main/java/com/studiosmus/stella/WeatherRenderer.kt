@@ -79,18 +79,31 @@ object WeatherRenderer {
 
         when (timeOfDay) {
             TimeOfDay.NIGHT -> {
-                rs *= 0.28f; gs *= 0.30f; bs *= 0.55f
-                rt += -10f; gt += -8f; bt += 18f
+                // Deep blue-dark: crush brightness, push blue channel
+                rs *= 0.25f; gs *= 0.27f; bs *= 0.52f
+                rt += -12f; gt += -10f; bt += 20f
             }
             TimeOfDay.DUSK -> {
-                rs *= 0.62f; gs *= 0.58f; bs *= 0.75f
-                rt += -5f; gt += -8f; bt += 10f
+                // Purple-orange mix: warm reds, desaturate blue
+                rs *= 0.78f; gs *= 0.60f; bs *= 0.65f
+                rt += 18f; gt += -4f; bt += -10f
+            }
+            TimeOfDay.GOLDEN_HOUR -> {
+                // Rich amber: boost red/green, suppress blue
+                rs *= 1.05f; gs *= 0.88f; bs *= 0.62f
+                rt += 22f; gt += 8f; bt += -15f
             }
             TimeOfDay.DAWN -> {
-                rs *= 0.72f; gs *= 0.68f; bs *= 0.78f
-                rt += 8f; gt += 2f; bt += -4f
+                // Soft pink-orange: slightly dark, warm tint
+                rs *= 0.80f; gs *= 0.72f; bs *= 0.72f
+                rt += 20f; gt += 5f; bt += -8f
             }
-            else -> { }
+            TimeOfDay.MORNING -> {
+                // Crisp cool light: slight blue-white lift
+                rs *= 0.96f; gs *= 0.97f; bs *= 1.02f
+                rt += 4f; gt += 4f; bt += 8f
+            }
+            else -> { }  // AFTERNOON: no modification
         }
 
         if (rs == 1f && gs == 1f && bs == 1f && rt == 0f && gt == 0f && bt == 0f) return null
