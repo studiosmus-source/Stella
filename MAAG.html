@@ -110,6 +110,28 @@ body {
 .section-divider {
   height: 1px; background: var(--border-light); margin: 4px 0;
 }
+.dati-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 0; cursor: pointer; user-select: none;
+  font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 600; color: #d4d4d8;
+  border-bottom: 1px solid var(--border-light);
+}
+.dati-header:hover { color: var(--gold-primary); }
+.dati-arrow { font-size: 10px; transition: transform 0.25s; }
+.dati-body { padding-top: 10px; display: none; flex-direction: column; gap: 0; }
+.dati-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.dati-field { display: flex; flex-direction: column; gap: 4px; }
+.dati-field.full { grid-column: 1 / -1; }
+.dati-field label { font-size: 10.5px; color: var(--text-muted); font-weight: 500; }
+.dati-field input[type="text"],
+.dati-field input[type="date"] {
+  padding: 7px 10px;
+  background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px; color: var(--text-primary); font-size: 12px;
+  font-family: 'Inter', sans-serif; width: 100%;
+  transition: border-color 0.2s;
+}
+.dati-field input:focus { outline: none; border-color: var(--gold-primary); }
 .form-group { display: flex; flex-direction: column; gap: 7px; }
 .form-label {
   font-size: 12px; font-weight: 500; color: #e4e4e7;
@@ -254,6 +276,31 @@ input[type="file"]::-webkit-file-upload-button:hover { background: #e4e4e7; }
         <span class="lbl-required">OBBLIGATORIO</span>
       </div>
       <input type="file" id="manuale_base" accept=".pdf" onchange="onTemplateSelected(this)">
+    </div>
+
+    <!-- ── DATI IDENTIFICATIVI ── -->
+    <div>
+      <div class="dati-header" onclick="toggleDati(this)">
+        <span>📋 Dati Identificativi Manuale</span>
+        <span class="dati-arrow">▼</span>
+      </div>
+      <div class="dati-body" id="datiBody">
+        <div style="height:10px"></div>
+        <div class="dati-grid">
+          <div class="dati-field full"><label>Costruttore</label><input type="text" id="d_costruttore" placeholder="es. MAAG Pump Systems AG"></div>
+          <div class="dati-field"><label>N° ordine produttore</label><input type="text" id="d_ordine_prod"></div>
+          <div class="dati-field"><label>Tipo di pompa</label><input type="text" id="d_tipo_pompa"></div>
+          <div class="dati-field full"><label>Data consegna manuale</label><input type="date" id="d_data_consegna"></div>
+          <div class="dati-field full"><label>Cliente</label><input type="text" id="d_cliente"></div>
+          <div class="dati-field"><label>N° ordine cliente</label><input type="text" id="d_ordine_cliente"></div>
+          <div class="dati-field"><label>Utente</label><input type="text" id="d_utente"></div>
+          <div class="dati-field full"><label>Luogo di installazione</label><input type="text" id="d_luogo"></div>
+          <div class="dati-field"><label>Paese</label><input type="text" id="d_paese"></div>
+          <div class="dati-field"><label>Numero TAG</label><input type="text" id="d_tag"></div>
+          <div class="dati-field full"><label>Linea</label><input type="text" id="d_linea"></div>
+        </div>
+        <div style="height:8px"></div>
+      </div>
     </div>
 
     <div class="section-divider"></div>
@@ -431,6 +478,36 @@ async function analizzaTemplate(buffer) {
     }
   }
 
+  // ── rilevamento posizioni campi modulo (prime 8 pagine) ──
+  const ETICHETTE = [
+    "Costruttore", "Numero d'ordine del produttore", "Tipo di pompa",
+    "Data di consegna del manuale", "Cliente", "Numero di ordine cliente",
+    "Utente", "Luogo di installazione", "Paese", "Numero TAG", "Linea"
+  ];
+  result.campiModulo = {};
+  for (let p = 1; p <= Math.min(8, nPag); p++) {
+    const page = await pdfjs.getPage(p);
+    const tc = await page.getTextContent();
+    for (const etichetta of ETICHETTE) {
+      if (result.campiModulo[etichetta]) continue;
+      for (const it of tc.items) {
+        const t = it.str.trim().replace(/:$/, '');
+        const matchLen = Math.min(etichetta.length, 14);
+        if (t === etichetta || t.replace(/:$/, '') === etichetta ||
+            (t.length >= matchLen && etichetta.startsWith(t.substring(0, matchLen)))) {
+          result.campiModulo[etichetta] = {
+            pageIndex: p - 1,
+            x: it.transform[4],
+            y: it.transform[5],
+            itemWidth: it.width || 0,
+            fontSize: Math.round(Math.abs(it.transform[3])) || 10,
+          };
+          break;
+        }
+      }
+    }
+  }
+
   // ── rilevamento altezza header dalla prima pagina sezione ──
   const firstSecKey = SECTIONS.find(k => result.sections[k]);
   if (firstSecKey) {
@@ -484,7 +561,7 @@ async function analizzaTemplate(buffer) {
 // ─────────────────────────────────────────────
 //  ASSEMBLAGGIO (pdf-lib)
 // ─────────────────────────────────────────────
-async function assemblaPDF(templateBuf, uploads, structure, opts) {
+async function assemblaPDF(templateBuf, uploads, structure, opts, valoriModulo) {
   const { PDFDocument, StandardFonts } = PDFLib;
   const bgColor = hexToRgb(opts.footerBgColor);
 
@@ -612,12 +689,35 @@ async function assemblaPDF(templateBuf, uploads, structure, opts) {
     }
   }
 
+  // ── SCRITTURA DATI IDENTIFICATIVI ──
+  if (valoriModulo) {
+    const pages = finalDoc.getPages();
+    for (const [etichetta, pos] of Object.entries(structure.campiModulo || {})) {
+      const valore = valoriModulo[etichetta];
+      if (!valore || !pos) continue;
+      const page = pages[pos.pageIndex];
+      const sz = Math.max(8, Math.min(pos.fontSize || 10, 11));
+      // Posizione: subito dopo la fine del testo dell'etichetta + gap
+      const valX = pos.x + pos.itemWidth + 8;
+      page.drawText(valore, { x: valX, y: pos.y + 1, size: sz, font, color: PDFLib.rgb(0,0,0) });
+    }
+  }
+
   return await finalDoc.save();
 }
 
 // ─────────────────────────────────────────────
 //  AUTO-ANALISI TEMPLATE AL CARICAMENTO
 // ─────────────────────────────────────────────
+function toggleDati(el) {
+  const body = document.getElementById('datiBody');
+  const arrow = el.querySelector('.dati-arrow');
+  const open = body.style.display === 'flex';
+  body.style.display = open ? 'none' : 'flex';
+  body.style.flexDirection = 'column';
+  if (arrow) arrow.style.transform = open ? '' : 'rotate(180deg)';
+}
+
 async function onTemplateSelected(input) {
   const file = input.files[0];
   if (!file) return;
@@ -703,7 +803,24 @@ async function avviaCompilazione() {
       footerBgColor: document.getElementById('opt_footer_color').value,
     };
 
-    const pdfBytes = await assemblaPDF(templateBuf, uploads, structure, opts);
+    const fmt = v => document.getElementById(v)?.value.trim() || '';
+    const rawData = document.getElementById('d_data_consegna').value;
+    const dataFmt = rawData ? rawData.split('-').reverse().join('/') : '';
+    const valoriModulo = {
+      "Costruttore": fmt('d_costruttore'),
+      "Numero d'ordine del produttore": fmt('d_ordine_prod'),
+      "Tipo di pompa": fmt('d_tipo_pompa'),
+      "Data di consegna del manuale": dataFmt,
+      "Cliente": fmt('d_cliente'),
+      "Numero di ordine cliente": fmt('d_ordine_cliente'),
+      "Utente": fmt('d_utente'),
+      "Luogo di installazione": fmt('d_luogo'),
+      "Paese": fmt('d_paese'),
+      "Numero TAG": fmt('d_tag'),
+      "Linea": fmt('d_linea'),
+    };
+
+    const pdfBytes = await assemblaPDF(templateBuf, uploads, structure, opts, valoriModulo);
 
     const blob = new Blob([pdfBytes], { type: 'application/pdf' });
     const link = document.createElement('a');
