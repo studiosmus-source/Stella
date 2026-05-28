@@ -469,21 +469,21 @@ async function analizzaTemplate(buffer) {
       }
     }
 
-    // Rilevamento numero pagina nel footer — cerca il numero più a DESTRA in basso
-    if (!result.footerInfo && p > (result.tocPageIndices.length > 0 ? result.tocPageIndices[result.tocPageIndices.length-1]+2 : 5)) {
-      let best = null;
+    // Numero pagina nel footer — scansiona TUTTE le pagine post-TOC e prende il numero più a DESTRA in assoluto
+    if (p > (result.tocPageIndices.length > 0 ? result.tocPageIndices[result.tocPageIndices.length-1]+2 : 5)) {
+      let pageBest = null;
       for (const it of items) {
         const y = it.transform[5];
         const x = it.transform[4];
         const txt = it.str.trim();
-        if (y < 110 && y > 3 && x > vp.width * 0.4 && /^\d{1,4}$/.test(txt) && parseInt(txt) > 0) {
-          // prendi il numero con x più alto (più a destra), solo nella metà destra
-          if (!best || x > best.x) best = { x, y, w: it.width || 0, pageNum: parseInt(txt), foundOnIdx: pIdx, pageHeight: vp.height, pageWidth: vp.width };
+        if (y < 110 && y > 3 && /^\d{1,4}$/.test(txt) && parseInt(txt) > 0) {
+          if (!pageBest || x > pageBest.x) pageBest = { x, y, w: it.width || 0, pageNum: parseInt(txt), foundOnIdx: pIdx, pageHeight: vp.height, pageWidth: vp.width };
         }
       }
-      if (best) {
-        result.footerInfo = best;
-        result.footerHeight = Math.max(35, Math.round(best.y) + 12);
+      // Mantieni il candidato globalmente più a destra (aggiorna senza stop anticipato)
+      if (pageBest && (!result.footerInfo || pageBest.x > result.footerInfo.x)) {
+        result.footerInfo = pageBest;
+        result.footerHeight = Math.max(35, Math.round(pageBest.y) + 12);
       }
     }
   }
@@ -491,16 +491,27 @@ async function analizzaTemplate(buffer) {
   // ── rilevamento posizioni campi modulo (prime 10 pagine) ──
   // Usa keyword matching flessibile: funziona con abbreviazioni, N°, varianti linguistiche
   const FIELD_MATCHERS = [
+    // Costruttore / Manufacturer
     { field: "Costruttore",                    test: t => t.startsWith("costruttore") || t.startsWith("manufacturer") || t.startsWith("hersteller") },
-    { field: "Numero d'ordine del produttore", test: t => t.includes("produttore") && (t.includes("ordine") || t.includes("order") || t.includes("n°")) },
-    { field: "Tipo di pompa",                  test: t => (t.startsWith("tipo") && t.length < 20) || t.startsWith("pump type") },
-    { field: "Data di consegna del manuale",   test: t => t.startsWith("data") && (t.includes("consegna") || t.includes("delivery") || t.includes("datum")) },
+    // N° ordine produttore / Manufacturer's order number
+    { field: "Numero d'ordine del produttore", test: t => (t.includes("produttore") && t.includes("ordine")) || (t.includes("manufacturer") && (t.includes("order") || t.includes("number"))) || t.startsWith("manufacturer's order") },
+    // Tipo pompa / Gear pump / Pump type
+    { field: "Tipo di pompa",                  test: t => (t.startsWith("tipo") && t.length < 20) || t.startsWith("pump type") || t.startsWith("gear pump") || t.startsWith("pompentype") },
+    // Data consegna / Operating manual date of delivery
+    { field: "Data di consegna del manuale",   test: t => (t.startsWith("data") && (t.includes("consegna") || t.includes("delivery"))) || t.startsWith("operating manual date") || (t.includes("manual") && t.includes("delivery")) || t.startsWith("datum") },
+    // Cliente / Customer
     { field: "Cliente",                        test: t => t === "cliente" || t === "customer" || t === "client" || t === "kunde" },
-    { field: "Numero di ordine cliente",       test: t => t.includes("ordine") && (t.includes("cliente") || t.includes("customer order") || t.includes("acquisto")) },
+    // N° ordine cliente / Customer's purchase number
+    { field: "Numero di ordine cliente",       test: t => (t.includes("ordine") && (t.includes("cliente") || t.includes("acquisto"))) || (t.includes("customer") && (t.includes("purchase") || t.includes("order"))) || t.startsWith("customer's purchase") },
+    // Utente / User
     { field: "Utente",                         test: t => t === "utente" || t === "user" || t === "benutzer" || t === "utilisateur" },
-    { field: "Luogo di installazione",         test: t => t.startsWith("luogo") || t.startsWith("installation site") || t.startsWith("lieu") },
+    // Luogo installazione / Installation site
+    { field: "Luogo di installazione",         test: t => t.startsWith("luogo") || t.startsWith("installation site") || t.startsWith("installation") || t.startsWith("lieu") },
+    // Paese / Country
     { field: "Paese",                          test: t => t === "paese" || t === "country" || t === "land" || t === "pays" },
-    { field: "Numero TAG",                     test: t => t === "tag" || t.startsWith("numero tag") || t.startsWith("n° tag") || t.startsWith("n.tag") || t.startsWith("tag number") },
+    // Numero TAG / TAG number
+    { field: "Numero TAG",                     test: t => t === "tag" || t.startsWith("numero tag") || t.startsWith("n° tag") || t.startsWith("tag number") || t.startsWith("n.tag") },
+    // Linea / Line
     { field: "Linea",                          test: t => t === "linea" || t === "line" || t === "linie" },
   ];
   result.campiModulo = {};
@@ -712,17 +723,28 @@ async function assemblaPDF(templateBuf, uploads, structure, opts, valoriModulo) 
   // ── SCRITTURA DATI IDENTIFICATIVI ──
   if (valoriModulo) {
     const pages = finalDoc.getPages();
-    for (const [etichetta, pos] of Object.entries(structure.campiModulo || {})) {
+    const campiEntries = Object.entries(structure.campiModulo || {});
+
+    // Calcola colonna valori uniforme: bordo destro max di tutte le etichette rilevate + gap
+    // Così tutti i valori sono allineati nella stessa colonna (cella grigia)
+    let maxLabelRight = 0;
+    for (const [etichetta, pos] of campiEntries) {
+      if (!pos) continue;
+      const sz = Math.max(8, Math.min(pos.fontSize || 10, 11));
+      const lText = pos.detectedText || etichetta;
+      const estW = pos.itemWidth > 5 ? pos.itemWidth : font.widthOfTextAtSize(lText, sz);
+      const right = pos.x + estW;
+      if (right > maxLabelRight) maxLabelRight = right;
+    }
+    // Fallback se nessun campo rilevato
+    const valueColX = maxLabelRight > 20 ? maxLabelRight + 18 : 220;
+
+    for (const [etichetta, pos] of campiEntries) {
       const valore = valoriModulo[etichetta];
       if (!valore || !pos) continue;
       const page = pages[pos.pageIndex];
       const sz = Math.max(8, Math.min(pos.fontSize || 10, 11));
-      // Usa il testo realmente rilevato nel PDF per stimare la larghezza dell'etichetta con font Helvetica
-      const labelForWidth = pos.detectedText || etichetta;
-      const estW = font.widthOfTextAtSize(labelForWidth, sz);
-      const effectiveW = pos.itemWidth > 5 ? pos.itemWidth : estW;
-      const valX = pos.x + effectiveW + 15;
-      page.drawText(valore, { x: valX, y: pos.y + 1, size: sz, font, color: PDFLib.rgb(0,0,0) });
+      page.drawText(valore, { x: valueColX, y: pos.y + 1, size: sz, font, color: PDFLib.rgb(0,0,0) });
     }
   }
 
