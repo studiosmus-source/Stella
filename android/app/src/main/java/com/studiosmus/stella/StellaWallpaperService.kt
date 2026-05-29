@@ -198,16 +198,11 @@ class StellaWallpaperService : WallpaperService() {
             // ── 2. Time-of-day sky gradient overlay ──────────────────────────
             ParticleSystem.drawTimeOverlay(canvas, timeOfDay, w, h)
 
-            // ── 3. Sun or Moon (positioned relative to detected horizon) ─────
-            when (timeOfDay) {
-                TimeOfDay.DAWN, TimeOfDay.MORNING,
-                TimeOfDay.AFTERNOON, TimeOfDay.GOLDEN_HOUR, TimeOfDay.DUSK ->
-                    ParticleSystem.drawSunArc(canvas, w, h, hour, sunriseH, sunsetH, hz)
-                TimeOfDay.NIGHT ->
-                    if (condition == WeatherCondition.CLEAR_NIGHT)
-                        ParticleSystem.drawMoon(canvas, w, h, hz)
-                else -> {}
-            }
+            // ── 3. Sun or Moon (fixed top-right HUD) ─────────────────────────
+            if (timeOfDay != TimeOfDay.NIGHT)
+                ParticleSystem.drawSun(canvas, w, h, timeOfDay)
+            else if (condition == WeatherCondition.CLEAR_NIGHT)
+                ParticleSystem.drawMoon(canvas, w, h)
 
             // ── 4. Stars above horizon only ───────────────────────────────────
             if (condition == WeatherCondition.CLEAR_NIGHT)
@@ -260,6 +255,10 @@ class StellaWallpaperService : WallpaperService() {
                 gd.update(dt)
                 gd.draw(canvas)
             }
+
+            // ── 8. Sky info HUD (temperature + condition label) ────────────────
+            ParticleSystem.drawSkyInfoHUD(canvas, w, h,
+                weatherData?.temperatureCelsius, condition)
         }
 
         private fun cloudParams(cond: WeatherCondition): Pair<Float, Float> = when (cond) {
