@@ -60,6 +60,7 @@ class StellaWallpaperService : WallpaperService() {
         private var clouds:     CloudSystem?     = null
         private var glassDrops: GlassDropSystem? = null
         private var hail:       HailSystem?      = null
+        private var celestial:  CelestialSystem? = null
 
         private val drawRunnable = object : Runnable {
             override fun run() {
@@ -148,6 +149,7 @@ class StellaWallpaperService : WallpaperService() {
             clouds     = CloudSystem(w, h)
             glassDrops = GlassDropSystem(w, h)
             hail       = HailSystem(w, h)
+            celestial  = CelestialSystem(w, h)
         }
 
         private fun fetchWeather() {
@@ -198,11 +200,11 @@ class StellaWallpaperService : WallpaperService() {
             // ── 2. Time-of-day sky gradient overlay ──────────────────────────
             ParticleSystem.drawTimeOverlay(canvas, timeOfDay, w, h)
 
-            // ── 3. Sun or Moon (fixed top-right HUD) ─────────────────────────
+            // ── 3. Sun or Moon (fixed top-right HUD, texture pre-rendered) ──────
             if (timeOfDay != TimeOfDay.NIGHT)
-                ParticleSystem.drawSun(canvas, w, h, timeOfDay)
+                celestial?.drawSun(canvas, timeOfDay)
             else if (condition == WeatherCondition.CLEAR_NIGHT)
-                ParticleSystem.drawMoon(canvas, w, h)
+                celestial?.drawMoon(canvas)
 
             // ── 4. Stars above horizon only ───────────────────────────────────
             if (condition == WeatherCondition.CLEAR_NIGHT)

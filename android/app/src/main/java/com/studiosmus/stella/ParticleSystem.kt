@@ -4,13 +4,8 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Paint
-import android.graphics.Path
 import android.graphics.RadialGradient
-import android.graphics.RectF
 import android.graphics.Shader
-import kotlin.math.PI
-import kotlin.math.abs
-import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.random.Random
 
@@ -129,210 +124,6 @@ object ParticleSystem {
         }
     }
 
-    // ─── Fixed HUD sun/moon (upper-right sky) ────────────────────────────────────
-
-    private val HUD_X_FRAC = 0.80f
-    private val HUD_Y_FRAC = 0.22f
-    private val HUD_R_FRAC = 0.038f   // ridotto: sole/luna più piccoli e realistici
-
-    // disk = overexposed centre color, bloom = close glow, scatter = wide sky tint
-    private data class SunStyle(val disk: Int, val bloom: Int, val scatter: Int)
-
-    private fun sunStyle(t: TimeOfDay) = when (t) {
-        TimeOfDay.DAWN        -> SunStyle(
-            Color.argb(255, 255, 210, 120),
-            Color.argb(115, 255, 150,  50),
-            Color.argb(62,  255,  90,  10))
-        TimeOfDay.MORNING     -> SunStyle(
-            Color.argb(255, 255, 255, 245),
-            Color.argb(100, 255, 230, 110),
-            Color.argb(40,  255, 200,  55))
-        TimeOfDay.AFTERNOON   -> SunStyle(
-            Color.argb(255, 255, 255, 255),
-            Color.argb(85,  255, 255, 220),
-            Color.argb(28,  255, 255, 200))
-        TimeOfDay.GOLDEN_HOUR -> SunStyle(
-            Color.argb(255, 255, 195,  70),
-            Color.argb(130, 255, 130,  10),
-            Color.argb(72,  235,  80,   0))
-        TimeOfDay.DUSK        -> SunStyle(
-            Color.argb(235, 240,  90,  30),
-            Color.argb(115, 200,  50,  10),
-            Color.argb(65,  160,  25,   0))
-        TimeOfDay.NIGHT       -> SunStyle(0, 0, 0)
-    }
-
-    internal fun drawSun(canvas: Canvas, w: Int, h: Int, timeOfDay: TimeOfDay) {
-        val s = sunStyle(timeOfDay)
-        if (Color.alpha(s.disk) == 0) return
-
-        val cx = w * HUD_X_FRAC
-        val cy = h * HUD_Y_FRAC
-        val r  = h * HUD_R_FRAC
-
-        // 1. Wide atmospheric scatter — warms the sky from the sun's direction
-        paint.shader = RadialGradient(cx, cy, r * 22f,
-            s.scatter, Color.TRANSPARENT, Shader.TileMode.CLAMP)
-        canvas.drawRect(0f, 0f, w.toFloat(), h.toFloat(), paint)
-
-        // 2. Close bloom — bright zone immediately around the disk
-        paint.shader = RadialGradient(cx, cy, r * 6f,
-            s.bloom, Color.TRANSPARENT, Shader.TileMode.CLAMP)
-        canvas.drawRect(cx - r * 7f, cy - r * 7f, cx + r * 7f, cy + r * 7f, paint)
-        paint.shader = null
-
-        // 3. Overexposed disk — white-hot core bleeding into disk color, no hard edge.
-        //    No rays: a real sun has no visible corona rays to the naked eye.
-        paint.shader = RadialGradient(cx, cy, r * 1.8f,
-            intArrayOf(
-                Color.argb(255, 255, 255, 255),
-                Color.argb(255, 255, 255, 255),
-                s.disk,
-                Color.TRANSPARENT
-            ),
-            floatArrayOf(0f, 0.42f, 0.72f, 1f),
-            Shader.TileMode.CLAMP)
-        canvas.drawCircle(cx, cy, r * 1.8f, paint)
-        paint.shader = null
-    }
-
-    // ─── Fixed HUD moon with real astronomical phase ──────────────────────────
-
-    internal fun drawMoon(canvas: Canvas, w: Int, h: Int) {
-        val cx = w * HUD_X_FRAC
-        val cy = h * HUD_Y_FRAC
-        val r  = h * HUD_R_FRAC
-
-        val phase = moonPhase()
-        val lit   = ((1.0 - cos(phase * 2 * PI)) / 2.0).toFloat()
-
-        // 1. Cold blue-silver sky glow — scales with illumination
-        val glowA = (20 + lit * 75).toInt()
-        paint.shader = RadialGradient(cx, cy, r * 9f,
-            Color.argb(glowA, 185, 205, 255), Color.TRANSPARENT, Shader.TileMode.CLAMP)
-        canvas.drawRect(cx - r * 10f, cy - r * 10f, cx + r * 10f, cy + r * 10f, paint)
-        paint.shader = null
-
-        // 2. Dark disk — real lunar albedo ~12%: the moon is dark gray, not white
-        paint.shader = RadialGradient(cx, cy, r,
-            Color.argb(215, 38, 42, 55), Color.argb(235, 22, 26, 40),
-            Shader.TileMode.CLAMP)
-        canvas.drawCircle(cx, cy, r, paint)
-        paint.shader = null
-
-        // 3. Earthshine — faint blue on the unlit side (visible in real crescent moons)
-        if (lit < 0.7f) {
-            val esAlpha = ((1f - lit) * 28).toInt()
-            paint.color = Color.argb(esAlpha, 80, 110, 180)
-            canvas.drawCircle(cx, cy, r, paint)
-        }
-
-        // 4. Lit surface — light gray with radial shading, NOT white
-        val litPath = moonLitPath(cx, cy, r, phase)
-        paint.shader = RadialGradient(cx, cy, r,
-            intArrayOf(
-                Color.argb(245, 210, 215, 222),
-                Color.argb(230, 185, 192, 205),
-                Color.argb(210, 155, 165, 180)
-            ),
-            floatArrayOf(0f, 0.55f, 1f),
-            Shader.TileMode.CLAMP)
-        canvas.drawPath(litPath, paint)
-        paint.shader = null
-
-        // 5. Thin bright rim on the sunlit limb
-        if (lit > 0.04f) {
-            canvas.save()
-            canvas.clipPath(litPath)
-            paint.color = Color.argb((lit * 90).toInt(), 238, 245, 255)
-            paint.style = Paint.Style.STROKE
-            paint.strokeWidth = r * 0.07f
-            canvas.drawCircle(cx, cy, r * 0.96f, paint)
-            paint.style = Paint.Style.FILL
-            canvas.restore()
-        }
-
-        // 6. Maria (dark patches) + craters — only visible on lit surface
-        if (lit > 0.10f) {
-            canvas.save()
-            canvas.clipPath(litPath)
-            val craterA = (lit * 50).toInt()
-            // Maria: large diffuse dark patches that give the moon its "face"
-            listOf(
-                Triple( 0.10f, -0.05f, 0.32f),
-                Triple(-0.22f,  0.18f, 0.22f)
-            ).forEach { (dx, dy, rFrac) ->
-                paint.color = Color.argb(craterA / 2, 110, 118, 135)
-                canvas.drawCircle(cx + r * dx, cy + r * dy, r * rFrac, paint)
-            }
-            // Craters: dark bowl + ejecta rim highlight
-            listOf(
-                Triple(-0.18f, -0.28f, 0.09f),
-                Triple( 0.32f,  0.16f, 0.08f),
-                Triple(-0.06f,  0.36f, 0.09f),
-                Triple( 0.14f, -0.42f, 0.06f),
-                Triple(-0.40f,  0.22f, 0.05f)
-            ).forEach { (dx, dy, rFrac) ->
-                paint.color = Color.argb(craterA, 125, 135, 155)
-                canvas.drawCircle(cx + r * dx, cy + r * dy, r * rFrac, paint)
-                paint.color = Color.argb(craterA / 3, 228, 235, 248)
-                canvas.drawCircle(
-                    cx + r * (dx - rFrac * 0.4f),
-                    cy + r * (dy - rFrac * 0.4f),
-                    r * rFrac * 0.55f, paint)
-            }
-            canvas.restore()
-        }
-    }
-
-    /** Current moon phase [0..1]: 0=new, 0.25=first quarter, 0.5=full, 0.75=last quarter */
-    private fun moonPhase(): Float {
-        // Known new moon: 6 Jan 2000 18:14 UTC → Unix epoch seconds 947182440
-        val synodicSec = 2551443.0
-        val ageS = (System.currentTimeMillis() / 1000.0 - 947182440.0)
-        return ((ageS % synodicSec + synodicSec) % synodicSec / synodicSec).toFloat()
-    }
-
-    /**
-     * Returns the Path covering the illuminated portion of the moon.
-     * phase [0..1]: 0=new, 0.5=full.
-     *
-     * Method:
-     *   dark = one semicircle (the unlit side) +/− terminator ellipse.
-     *   lit  = fullCircle DIFFERENCE dark.
-     *
-     *   terminatorRx = r·cos(phase·2π):
-     *     > 0 → crescent/new (shadow extends toward lit side)
-     *     = 0 → quarter (straight vertical terminator)
-     *     < 0 → gibbous/full (shadow retreats, revealing more of the lit side)
-     */
-    private fun moonLitPath(cx: Float, cy: Float, r: Float, phase: Float): Path {
-        val waxing = phase <= 0.5f
-
-        // Dark semicircle: left half for waxing (right side lit), right half for waning
-        val semi = Path().apply {
-            moveTo(cx, cy - r)
-            arcTo(RectF(cx - r, cy - r, cx + r, cy + r),
-                270f, if (waxing) -180f else 180f)   // -180 = counterclockwise → left; +180 = clockwise → right
-            close()
-        }
-
-        val terminatorRx = r * cos(phase * 2 * PI.toFloat())
-        val absRx = abs(terminatorRx)
-        val dark  = Path(semi)
-        if (absRx > 0.5f) {
-            val terminator = Path().apply {
-                addOval(RectF(cx - absRx, cy - r, cx + absRx, cy + r), Path.Direction.CW)
-            }
-            dark.op(terminator, if (terminatorRx > 0f) Path.Op.UNION else Path.Op.DIFFERENCE)
-        }
-
-        return Path().apply {
-            addCircle(cx, cy, r, Path.Direction.CW)
-            op(dark, Path.Op.DIFFERENCE)
-        }
-    }
-
     // ─── Sky info HUD (temperature + condition, below sun/moon disk) ─────────
 
     internal fun drawSkyInfoHUD(
@@ -340,9 +131,9 @@ object ParticleSystem {
         temp: Double?, condition: WeatherCondition?
     ) {
         if (temp == null && condition == null) return
-        val cx        = w * HUD_X_FRAC
-        val cy        = h * HUD_Y_FRAC
-        val r         = h * HUD_R_FRAC
+        val cx       = w * CelestialSystem.HUD_X_FRAC
+        val cy       = h * CelestialSystem.HUD_Y_FRAC
+        val r        = h * CelestialSystem.HUD_R_FRAC
         val diskBot   = cy + r
         val tempSize  = h * 0.038f
         val condSize  = h * 0.021f
