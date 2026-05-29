@@ -2,36 +2,36 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>MAAG QC Incoming - Gestione NC</title>
     <style>
-        body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f3f2f1; color: #323130; margin: 20px; }
+        body { font-family: Arial, sans-serif; background-color: #f3f2f1; color: #323130; margin: 20px; }
         .container { max-width: 1200px; margin: 0 auto; background: white; padding: 25px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.15); }
 
-        .header-title { display: flex; align-items: center; border-bottom: 2px solid #e8a020; padding-bottom: 10px; margin-bottom: 20px; }
+        .header-title { border-bottom: 2px solid #e8a020; padding-bottom: 10px; margin-bottom: 20px; }
         h2 { color: #e8a020; margin: 0; font-size: 22px; }
         h3 { color: #2b2b2b; margin-top: 20px; margin-bottom: 12px; font-size: 16px; border-left: 4px solid #e8a020; padding-left: 8px; }
 
         .form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; background: #f9f9f9; padding: 20px; border-radius: 4px; border: 1px solid #e1dfdd; }
         .form-group { display: flex; flex-direction: column; }
         .form-group label { font-size: 13px; font-weight: bold; color: #323130; margin-bottom: 6px; }
-        .form-group input { padding: 10px; border: 1px solid #a19f9d; border-radius: 4px; font-size: 13px; background: white; }
+        .form-group input { padding: 10px; border: 1px solid #a19f9d; border-radius: 4px; font-size: 13px; }
 
-        .btn-container { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; margin-bottom: 30px; }
-        .btn-save  { background-color: #e8a020; color: white; border: none; padding: 12px 24px; font-weight: bold; border-radius: 4px; cursor: pointer; font-size: 14px; }
-        .btn-save:hover  { background-color: #c8881a; }
+        .btn-container { text-align: right; margin-top: 20px; margin-bottom: 30px; }
+        .btn-save { background-color: #e8a020; color: white; border: none; padding: 12px 24px; font-weight: bold; border-radius: 4px; cursor: pointer; font-size: 14px; }
 
-        .toast { display: none; background: #107c41; color: white; padding: 10px 18px; border-radius: 4px; font-weight: bold; font-size: 13px; align-items: center; }
+        #toast { display: none; background: #107c41; color: white; padding: 10px 18px; border-radius: 4px; font-weight: bold; font-size: 13px; margin-right: 12px; }
 
-        table { width: 100%; border-collapse: collapse; background: white; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { padding: 12px 10px; text-align: left; border-bottom: 1px solid #edebe9; font-size: 13px; }
-        th { background-color: #f3f2f1; color: #323130; font-weight: 600; border-bottom: 2px solid #8a8886; }
+        th { background-color: #f3f2f1; font-weight: 600; border-bottom: 2px solid #8a8886; }
 
-        .status-alert { background-color: #fde7e9; color: #a80000; font-weight: bold; padding: 5px 10px; border-radius: 4px; border: 1px solid #f3b0b3; display: inline-block; font-size: 12px; }
-        .status-ok    { background-color: #dff6dd; color: #107c41; font-weight: bold; padding: 5px 10px; border-radius: 4px; border: 1px solid #92c390; display: inline-block; font-size: 12px; }
+        .s-alert { background: #fde7e9; color: #a80000; font-weight: bold; padding: 5px 10px; border-radius: 4px; border: 1px solid #f3b0b3; font-size: 12px; display: inline-block; }
+        .s-ok    { background: #dff6dd; color: #107c41; font-weight: bold; padding: 5px 10px; border-radius: 4px; border: 1px solid #92c390; font-size: 12px; display: inline-block; }
 
-        .btn-done { background-color: #107c41; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px; }
-        .btn-pdf  { background-color: #333; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px; margin-right: 4px; }
-        .btn-del  { background-color: #a80000; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-left: 4px; }
+        .btn-pdf  { background: #333; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-right: 4px; }
+        .btn-done { background: #107c41; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-right: 4px; }
+        .btn-del  { background: #a80000; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; }
 
         .row-done { opacity: 0.4; }
         .no-fade  { opacity: 1 !important; }
@@ -39,23 +39,25 @@
         #printArea { display: none; }
 
         @media print {
-            body { background: white; margin: 0; padding: 0; font-family: Arial, sans-serif; }
+            body { background: white; margin: 0; padding: 0; }
             .container { display: none !important; }
-            #printArea { display: block !important; padding: 28px 36px; }
-
-            .ph-logo-box { display: flex; align-items: center; gap: 10px; margin-bottom: 32px; }
+            #printArea {
+                display: block !important;
+                padding: 28px 36px;
+                font-family: Arial, sans-serif;
+            }
+            .ph-logo  { display: flex; align-items: center; margin-bottom: 32px; }
             .ph-arrow { width: 0; height: 0; border-top: 22px solid transparent; border-bottom: 22px solid transparent; border-left: 28px solid #e8a020; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            .ph-maag { font-size: 28px; font-weight: 900; color: #1a1a1a; letter-spacing: -1px; }
-            .ph-brands { font-size: 7px; color: #555; line-height: 1.7; margin-left: 14px; margin-top: 2px; }
-            .ph-brands b { color: #1a1a1a; }
+            .ph-maag  { font-size: 28px; font-weight: 900; margin-left: 10px; letter-spacing: -1px; }
+            .ph-brands { font-size: 7px; color: #555; line-height: 1.8; margin-left: 14px; }
 
-            .ph-title    { text-align: center; font-size: 32px; font-weight: 900; font-style: italic; color: #1a1a1a; margin: 0 0 4px; }
-            .ph-subtitle { text-align: center; font-size: 20px; font-weight: 700; color: #2e6db4; margin: 0 0 16px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            .ph-hr { border: none; border-top: 1px solid #aaa; margin-bottom: 26px; }
+            .ph-h1 { text-align: center; font-size: 32px; font-weight: 900; font-style: italic; margin: 0 0 4px; }
+            .ph-h2 { text-align: center; font-size: 20px; font-weight: 700; color: #2e6db4; margin: 0 0 16px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .ph-hr { border: none; border-top: 1px solid #999; margin-bottom: 24px; }
 
-            .ph-field { display: flex; align-items: flex-end; margin-bottom: 17px; }
-            .ph-label { font-size: 13px; width: 210px; flex-shrink: 0; padding-bottom: 3px; }
-            .ph-value { flex: 1; border-bottom: 1px solid #333; min-height: 20px; padding: 0 0 2px 6px; font-size: 13px; }
+            .ph-row   { display: flex; align-items: flex-end; margin-bottom: 17px; }
+            .ph-label { font-size: 13px; width: 210px; flex-shrink: 0; }
+            .ph-val   { flex: 1; border-bottom: 1px solid #333; min-height: 20px; padding-left: 6px; font-size: 13px; }
         }
     </style>
 </head>
@@ -63,34 +65,34 @@
 
 <div class="container">
     <div class="header-title">
-        <h2>▶ MAAG — QC Incoming: Gestione NC</h2>
+        <h2>MAAG &mdash; QC Incoming: Gestione NC</h2>
     </div>
 
-    <h3>📋 Compilazione Dati Non Conformità</h3>
+    <h3>Compilazione Dati Non Conformit&agrave;</h3>
     <div class="form-grid">
-        <div class="form-group"><label>NC:</label><input type="text" id="nc_num" placeholder="Es. 2026-045"></div>
-        <div class="form-group"><label>Fornitore:</label><input type="text" id="fornitore" placeholder="Inserire Fornitore"></div>
-        <div class="form-group"><label>N° Ordine di produzione:</label><input type="text" id="odp" placeholder="Numero Ordine Produzione"></div>
-        <div class="form-group"><label>SAP Grezzo:</label><input type="text" id="sap_grezzo" placeholder="Codice SAP Grezzo"></div>
-        <div class="form-group"><label>SAP Finito:</label><input type="text" id="sap_finito" placeholder="Codice SAP Finito"></div>
-        <div class="form-group"><label>Ordine di acquisto:</label><input type="text" id="oda" placeholder="Numero Ordine Acquisto"></div>
-        <div class="form-group"><label>Posizione:</label><input type="text" id="posizione" placeholder="Posizione Ordine"></div>
-        <div class="form-group"><label>Colata:</label><input type="text" id="colata" placeholder="Numero Colata"></div>
-        <div class="form-group"><label>Quantità Fornita:</label><input type="text" id="q_fornita" placeholder="Pezzi / Peso Forniti"></div>
-        <div class="form-group"><label>Quantità Scarto:</label><input type="text" id="q_scarto" placeholder="Pezzi / Peso Scartati"></div>
-        <div class="form-group"><label>Numero Fattura:</label><input type="text" id="n_fattura" placeholder="Numero Fattura"></div>
-        <div class="form-group"><label>Data Fattura:</label><input type="text" id="data_fattura" placeholder="GG/MM/AAAA"></div>
-        <div class="form-group"><label>Intercettazione:</label><input type="text" id="intercettazione" placeholder="Es. Controllo Ingressi"></div>
-        <div class="form-group"><label>Ordine Cliente:</label><input type="text" id="ordine_cliente" placeholder="Riferimento Cliente"></div>
-        <div class="form-group"><label>Posizione Cliente:</label><input type="text" id="posizione_cliente" placeholder="Posizione Ordine Cliente"></div>
+        <div class="form-group"><label>NC:</label>                      <input type="text" id="nc_num"            placeholder="Es. 2026-045"></div>
+        <div class="form-group"><label>Fornitore:</label>               <input type="text" id="fornitore"         placeholder="Inserire Fornitore"></div>
+        <div class="form-group"><label>N. Ordine di produzione:</label>  <input type="text" id="odp"               placeholder="Numero Ordine Produzione"></div>
+        <div class="form-group"><label>SAP Grezzo:</label>              <input type="text" id="sap_grezzo"        placeholder="Codice SAP Grezzo"></div>
+        <div class="form-group"><label>SAP Finito:</label>              <input type="text" id="sap_finito"        placeholder="Codice SAP Finito"></div>
+        <div class="form-group"><label>Ordine di acquisto:</label>      <input type="text" id="oda"               placeholder="Numero Ordine Acquisto"></div>
+        <div class="form-group"><label>Posizione:</label>               <input type="text" id="posizione"         placeholder="Posizione Ordine"></div>
+        <div class="form-group"><label>Colata:</label>                  <input type="text" id="colata"            placeholder="Numero Colata"></div>
+        <div class="form-group"><label>Quantit&agrave; Fornita:</label>  <input type="text" id="q_fornita"         placeholder="Pezzi / Peso Forniti"></div>
+        <div class="form-group"><label>Quantit&agrave; Scarto:</label>   <input type="text" id="q_scarto"          placeholder="Pezzi / Peso Scartati"></div>
+        <div class="form-group"><label>Numero Fattura:</label>          <input type="text" id="n_fattura"         placeholder="Numero Fattura"></div>
+        <div class="form-group"><label>Data Fattura:</label>            <input type="text" id="data_fattura"      placeholder="GG/MM/AAAA"></div>
+        <div class="form-group"><label>Intercettazione:</label>        <input type="text" id="intercettazione"   placeholder="Es. Controllo Ingressi"></div>
+        <div class="form-group"><label>Ordine Cliente:</label>         <input type="text" id="ordine_cliente"    placeholder="Riferimento Cliente"></div>
+        <div class="form-group"><label>Posizione Cliente:</label>      <input type="text" id="posizione_cliente" placeholder="Posizione Ordine Cliente"></div>
     </div>
 
     <div class="btn-container">
-        <div class="toast" id="toast">✔ Salvato nel registro</div>
-        <button class="btn-save" onclick="aggiungiNC()">+ Aggiungi al Registro</button>
+        <span id="toast">Salvato nel registro</span>
+        <button class="btn-save" id="btnSalva">+ Aggiungi al Registro</button>
     </div>
 
-    <h3>🔍 Registro Attività</h3>
+    <h3>Registro Attivit&agrave;</h3>
     <table>
         <thead>
             <tr>
@@ -106,21 +108,46 @@
     </table>
 </div>
 
-<!-- Area visibile solo in stampa -->
 <div id="printArea"></div>
 
-<script>
-    document.addEventListener("DOMContentLoaded", mostraRegistro);
+<script type="text/javascript">
+    var DB_KEY = 'db_maag_nc';
 
-    function leggi(id) { return document.getElementById(id).value.trim() || "-"; }
+    function leggi(id) {
+        var el = document.getElementById(id);
+        var val = el ? el.value.trim() : '';
+        return val || '-';
+    }
+
+    function caricaDB() {
+        try {
+            return JSON.parse(localStorage.getItem(DB_KEY)) || [];
+        } catch(e) {
+            return [];
+        }
+    }
+
+    function salvaDB(db) {
+        try {
+            localStorage.setItem(DB_KEY, JSON.stringify(db));
+        } catch(e) {
+            alert('Errore nel salvataggio: ' + e.message);
+        }
+    }
 
     function aggiungiNC() {
-        const fornitore = document.getElementById('fornitore').value.trim();
-        if (!fornitore) { alert("Il campo Fornitore è obbligatorio."); return; }
+        var fornitore = document.getElementById('fornitore').value.trim();
+        if (!fornitore) {
+            alert('Il campo Fornitore e\' obbligatorio.');
+            return;
+        }
 
-        const nc = {
-            id:                Date.now(),
-            data_inserimento:  new Date().toLocaleDateString('it-IT'),
+        var oggi = new Date();
+        var data = oggi.getDate() + '/' + (oggi.getMonth()+1) + '/' + oggi.getFullYear();
+
+        var nc = {
+            id:                oggi.getTime(),
+            data_inserimento:  data,
             nc_num:            leggi('nc_num'),
             fornitore:         fornitore,
             odp:               leggi('odp'),
@@ -136,122 +163,157 @@
             intercettazione:   leggi('intercettazione'),
             ordine_cliente:    leggi('ordine_cliente'),
             posizione_cliente: leggi('posizione_cliente'),
-            stato: "PENDENTE"
+            stato: 'PENDENTE'
         };
 
-        let db = JSON.parse(localStorage.getItem('db_maag_nc')) || [];
+        var db = caricaDB();
         db.push(nc);
-        localStorage.setItem('db_maag_nc', JSON.stringify(db));
+        salvaDB(db);
 
         mostraRegistro();
         mostraToast();
-        document.querySelectorAll('.form-grid input').forEach(el => el.value = '');
+
+        var inputs = document.querySelectorAll('.form-grid input');
+        for (var i = 0; i < inputs.length; i++) {
+            inputs[i].value = '';
+        }
     }
 
     function mostraToast() {
-        const t = document.getElementById('toast');
-        t.style.display = 'flex';
-        setTimeout(() => t.style.display = 'none', 2500);
+        var t = document.getElementById('toast');
+        t.style.display = 'inline-block';
+        setTimeout(function() { t.style.display = 'none'; }, 2500);
     }
 
     function mostraRegistro() {
-        const db = JSON.parse(localStorage.getItem('db_maag_nc')) || [];
-        const tbody = document.getElementById('tabellaCorpo');
+        var db = caricaDB();
+        var tbody = document.getElementById('tabellaCorpo');
         tbody.innerHTML = '';
-        db.sort((a, b) => (a.stato === 'PENDENTE' ? -1 : 1));
 
-        db.forEach(item => {
-            const tr = document.createElement('tr');
+        db.sort(function(a, b) {
+            if (a.stato === 'PENDENTE' && b.stato !== 'PENDENTE') return -1;
+            if (a.stato !== 'PENDENTE' && b.stato === 'PENDENTE') return 1;
+            return 0;
+        });
+
+        for (var i = 0; i < db.length; i++) {
+            var item = db[i];
+            var tr = document.createElement('tr');
             if (item.stato === 'TERMINATA') tr.className = 'row-done';
 
-            const datiSicuri = encodeURIComponent(JSON.stringify(item));
+            var tdData    = document.createElement('td'); tdData.innerHTML = item.data_inserimento;
+            var tdNC      = document.createElement('td'); tdNC.innerHTML = '<strong>' + item.nc_num + '</strong>';
+            var tdForn    = document.createElement('td'); tdForn.innerHTML = item.fornitore;
+            var tdSap     = document.createElement('td');
+            tdSap.style.fontSize = '12px';
+            tdSap.innerHTML = 'G: ' + item.sap_grezzo + ' | F: ' + item.sap_finito + '<br>ODA: ' + item.oda + ' &mdash; Pos: ' + item.posizione;
 
-            tr.innerHTML = `
-                <td>${item.data_inserimento}</td>
-                <td><strong>${item.nc_num}</strong></td>
-                <td>${item.fornitore}</td>
-                <td style="font-size:12px;">
-                    G: ${item.sap_grezzo} | F: ${item.sap_finito}<br>
-                    ODA: ${item.oda} — Pos: ${item.posizione}
-                </td>
-                <td>
-                    <span class="${item.stato === 'PENDENTE' ? 'status-alert' : 'status-ok'} no-fade">
-                        ${item.stato === 'PENDENTE' ? '● In Attesa' : '✔ Terminata'}
-                    </span>
-                </td>
-                <td class="no-fade">
-                    <button class="btn-pdf"  onclick="apriPDF('${datiSicuri}')">⬇️ PDF</button>
-                    ${item.stato === 'PENDENTE'
-                        ? `<button class="btn-done" onclick="chiudi(${item.id})">✔ Fatto</button>`
-                        : ''}
-                    <button class="btn-del" onclick="elimina(${item.id})">🗑</button>
-                </td>`;
+            var tdStato   = document.createElement('td');
+            var span = document.createElement('span');
+            span.className = (item.stato === 'PENDENTE' ? 's-alert' : 's-ok') + ' no-fade';
+            span.innerHTML = item.stato === 'PENDENTE' ? 'In Attesa' : 'Terminata';
+            tdStato.appendChild(span);
+
+            var tdAzioni  = document.createElement('td');
+            tdAzioni.className = 'no-fade';
+
+            var btnPdf = document.createElement('button');
+            btnPdf.className = 'btn-pdf';
+            btnPdf.innerHTML = 'PDF';
+            (function(d) {
+                btnPdf.onclick = function() { apriPDF(d); };
+            })(item);
+            tdAzioni.appendChild(btnPdf);
+
+            if (item.stato === 'PENDENTE') {
+                var btnDone = document.createElement('button');
+                btnDone.className = 'btn-done';
+                btnDone.innerHTML = 'Fatto';
+                (function(id) {
+                    btnDone.onclick = function() { chiudi(id); };
+                })(item.id);
+                tdAzioni.appendChild(btnDone);
+            }
+
+            var btnDel = document.createElement('button');
+            btnDel.className = 'btn-del';
+            btnDel.innerHTML = 'Elimina';
+            (function(id) {
+                btnDel.onclick = function() { elimina(id); };
+            })(item.id);
+            tdAzioni.appendChild(btnDel);
+
+            tr.appendChild(tdData);
+            tr.appendChild(tdNC);
+            tr.appendChild(tdForn);
+            tr.appendChild(tdSap);
+            tr.appendChild(tdStato);
+            tr.appendChild(tdAzioni);
             tbody.appendChild(tr);
-        });
+        }
     }
 
     function chiudi(id) {
-        let db = JSON.parse(localStorage.getItem('db_maag_nc'));
-        db = db.map(x => x.id === id ? {...x, stato: 'TERMINATA'} : x);
-        localStorage.setItem('db_maag_nc', JSON.stringify(db));
+        var db = caricaDB();
+        for (var i = 0; i < db.length; i++) {
+            if (db[i].id === id) db[i].stato = 'TERMINATA';
+        }
+        salvaDB(db);
         mostraRegistro();
     }
 
     function elimina(id) {
-        if (!confirm("Rimuovere questa NC dal registro?")) return;
-        let db = JSON.parse(localStorage.getItem('db_maag_nc'));
-        db = db.filter(x => x.id !== id);
-        localStorage.setItem('db_maag_nc', JSON.stringify(db));
+        if (!confirm('Rimuovere questa NC dal registro?')) return;
+        var db = caricaDB();
+        var nuovo = [];
+        for (var i = 0; i < db.length; i++) {
+            if (db[i].id !== id) nuovo.push(db[i]);
+        }
+        salvaDB(nuovo);
         mostraRegistro();
     }
 
-    /* ── PDF ── */
-    function apriPDF(encoded) {
-        const d = JSON.parse(decodeURIComponent(encoded));
-        costruisciPDF(d);
-        // Piccolo ritardo per garantire che il DOM sia aggiornato prima della stampa
-        setTimeout(() => window.print(), 150);
+    function apriPDF(d) {
+        var html = '';
+        html += '<div class="ph-logo">';
+        html += '<div class="ph-arrow"></div>';
+        html += '<div class="ph-maag">MAAG</div>';
+        html += '<div class="ph-brands">';
+        html += 'PUMP &amp; FILTRATION SYSTEMS &nbsp;&rsaquo;&nbsp; PELLETIZING &amp; PULVERIZING SYSTEMS &nbsp;&rsaquo;&nbsp; RECYCLING SYSTEMS &nbsp;&rsaquo;&nbsp; MEASUREMENT &amp; CONTROL SYSTEMS<br>';
+        html += '<strong>MAAG &nbsp; WITTE &nbsp; GALA &nbsp; SCHEER &nbsp; AMN &nbsp; ETTLINGER &nbsp; SIKORA &nbsp; XANTEC</strong><br>';
+        html += 'REDUCTION &nbsp; AUTOMATIK';
+        html += '</div></div>';
+        html += '<div class="ph-h1">QC Incoming</div>';
+        html += '<div class="ph-h2">Gestione NC</div>';
+        html += '<hr class="ph-hr">';
+        html += riga('NC:', d.nc_num);
+        html += riga('N&deg; Ordine di produzione:', d.odp);
+        html += riga('SAP Grezzo:', d.sap_grezzo);
+        html += riga('SAP Finito:', d.sap_finito);
+        html += riga('Ordine di acquisto:', d.oda);
+        html += riga('Posizione:', d.posizione);
+        html += riga('Colata:', d.colata);
+        html += riga('Fornitore:', d.fornitore);
+        html += riga('Quantit&agrave; Fornita:', d.q_fornita);
+        html += riga('Quantit&agrave; Scarto:', d.q_scarto);
+        html += riga('Numero Fattura:', d.n_fattura);
+        html += riga('Data Fattura:', d.data_fattura);
+        html += riga('Intercettazione:', d.intercettazione);
+        html += riga('Ordine Cliente:', d.ordine_cliente);
+        html += riga('Posizione Cliente:', d.posizione_cliente);
+
+        document.getElementById('printArea').innerHTML = html;
+        setTimeout(function() { window.print(); }, 200);
     }
 
-    function campo(label, valore) {
-        const testo = (!valore || valore === '-') ? '' : valore;
-        return `<div class="ph-field">
-                    <div class="ph-label">${label}</div>
-                    <div class="ph-value">${testo}</div>
-                </div>`;
+    function riga(label, valore) {
+        var testo = (!valore || valore === '-') ? '' : valore;
+        return '<div class="ph-row"><div class="ph-label">' + label + '</div><div class="ph-val">' + testo + '</div></div>';
     }
 
-    function costruisciPDF(d) {
-        document.getElementById('printArea').innerHTML = `
-            <div class="ph-logo-box">
-                <div class="ph-arrow"></div>
-                <div class="ph-maag">MAAG</div>
-                <div class="ph-brands">
-                    PUMP &amp; FILTRATION SYSTEMS &nbsp;▸&nbsp; PELLETIZING &amp; PULVERIZING SYSTEMS &nbsp;▸&nbsp; RECYCLING SYSTEMS &nbsp;▸&nbsp; MEASUREMENT &amp; CONTROL SYSTEMS<br>
-                    <b>MAAG &nbsp; WITTE &nbsp; GALA &nbsp; SCHEER &nbsp; AMN &nbsp; ETTLINGER &nbsp; SIKORA &nbsp; XANTEC</b><br>
-                    REDUCTION &nbsp; AUTOMATIK
-                </div>
-            </div>
-            <div class="ph-title">QC Incoming</div>
-            <div class="ph-subtitle">Gestione NC</div>
-            <hr class="ph-hr">
-            ${campo('NC:', d.nc_num)}
-            ${campo('N° Ordine di produzione:', d.odp)}
-            ${campo('SAP Grezzo:', d.sap_grezzo)}
-            ${campo('SAP Finito:', d.sap_finito)}
-            ${campo('Ordine di acquisto:', d.oda)}
-            ${campo('Posizione:', d.posizione)}
-            ${campo('Colata:', d.colata)}
-            ${campo('Fornitore:', d.fornitore)}
-            ${campo('Quantità Fornita:', d.q_fornita)}
-            ${campo('Quantità Scarto:', d.q_scarto)}
-            ${campo('Numero Fattura:', d.n_fattura)}
-            ${campo('Data Fattura:', d.data_fattura)}
-            ${campo('Intercettazione:', d.intercettazione)}
-            ${campo('Ordine Cliente:', d.ordine_cliente)}
-            ${campo('Posizione Cliente:', d.posizione_cliente)}
-        `;
-    }
+    // Init
+    document.getElementById('btnSalva').onclick = aggiungiNC;
+    mostraRegistro();
 </script>
 
 </body>
