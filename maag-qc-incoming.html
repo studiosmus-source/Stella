@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>MAAG QC Incoming - Gestione NC</title>
+    <style>
+        /* Stili per la visualizzazione a schermo */
+        body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f3f2f1; color: #323130; margin: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 25px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.15); }
+
+        .header-title { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #6264a7; padding-bottom: 10px; margin-bottom: 20px; }
+        h2 { color: #6264a7; margin: 0; font-size: 22px; }
+
+        h3 { color: #2b2b2b; margin-top: 20px; margin-bottom: 12px; font-size: 16px; border-left: 4px solid #6264a7; padding-left: 8px; }
+
+        .form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; background: #f9f9f9; padding: 20px; border-radius: 4px; border: 1px solid #e1dfdd; }
+        .form-group { display: flex; flex-direction: column; }
+        .form-group label { font-size: 13px; font-weight: bold; color: #323130; margin-bottom: 6px; }
+        .form-group input { padding: 10px; border: 1px solid #a19f9d; border-radius: 4px; font-size: 13px; background: white; }
+
+        .btn-container { text-align: right; margin-top: 20px; margin-bottom: 30px; }
+        .btn-add { background-color: #6264a7; color: white; border: none; padding: 12px 24px; font-weight: bold; border-radius: 4px; cursor: pointer; font-size: 14px; }
+
+        table { width: 100%; border-collapse: collapse; background: white; margin-top: 10px; }
+        th, td { padding: 12px 10px; text-align: left; border-bottom: 1px solid #edebe9; font-size: 13px; }
+        th { background-color: #f3f2f1; color: #323130; font-weight: 600; border-bottom: 2px solid #8a8886; }
+
+        .status-alert { background-color: #fde7e9; color: #a80000; font-weight: bold; padding: 6px 10px; border-radius: 4px; border: 1px solid #f3b0b3; display: inline-block; }
+        .status-ok { background-color: #dff6dd; color: #107c41; font-weight: bold; padding: 6px 10px; border-radius: 4px; border: 1px solid #92c390; display: inline-block; }
+
+        .btn-done { background-color: #107c41; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .btn-download { background-color: #212121; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-right: 4px; }
+        .btn-del { background-color: #a80000; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; }
+
+        .row-done { background-color: #faf9f8; }
+        .row-done td { text-decoration: line-through; color: #a19f9d; }
+        .no-strike { text-decoration: none !important; color: #323130 !important; }
+
+        /* Struttura nascosta a schermo, serve solo per la stampa del PDF ufficiale */
+        #sezioneStampaUfficiale { display: none; }
+
+        /* ---------------------------------------------------
+           REGOLAZIONE PER LA STAMPA: MINIERA D'ORO
+           Quando si stampa, nasconde l'interfaccia e mostra solo il foglio pulito
+        --------------------------------------------------- */
+        @media print {
+            body { background: white; color: black; margin: 0; padding: 0; }
+            .container { box-shadow: none; padding: 0; max-width: 100%; }
+            .header-title, h3, .form-grid, .btn-container, table, h2 { display: none !important; }
+
+            #sezioneStampaUfficiale { display: block !important; padding: 20px; }
+            .print-header { background-color: #6264a7 !important; color: white !important; padding: 15px; text-align: center; font-weight: bold; font-size: 18px; border: 1px solid #333; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .print-title { font-size: 16px; font-weight: bold; margin-top: 20px; margin-bottom: 15px; border-bottom: 2px solid black; padding-bottom: 5px; }
+            .print-table { width: 100%; border-collapse: collapse; }
+            .print-table td { padding: 8px 10px; border-bottom: 1px solid #ddd; font-size: 14px; vertical-align: top; }
+            .print-table td.label { font-weight: bold; width: 35%; background-color: #f5f5f5 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header-title">
+        <h2>MAAG — QC Incoming: Gestione NC</h2>
+    </div>
+
+    <h3>📋 Compilazione Dati Non Conformità</h3>
+    <div class="form-grid">
+        <div class="form-group"><label>NC:</label><input type="text" id="nc_num" placeholder="Es. 2026-045"></div>
+        <div class="form-group"><label>Fornitore:</label><input type="text" id="fornitore" placeholder="Inserire Fornitore" required></div>
+        <div class="form-group"><label>N° Ordine di produzione:</label><input type="text" id="odp" placeholder="Numero Ordine Produzione"></div>
+        <div class="form-group"><label>SAP Grezzo:</label><input type="text" id="sap_grezzo" placeholder="Codice SAP Grezzo"></div>
+        <div class="form-group"><label>SAP Finito:</label><input type="text" id="sap_finito" placeholder="Codice SAP Finito"></div>
+        <div class="form-group"><label>Ordine di acquisto:</label><input type="text" id="oda" placeholder="Numero Ordine Acquisto"></div>
+        <div class="form-group"><label>Posizione:</label><input type="text" id="posizione" placeholder="Posizione Ordine"></div>
+        <div class="form-group"><label>Colata:</label><input type="text" id="colata" placeholder="Numero Colata"></div>
+        <div class="form-group"><label>Quantità Fornita:</label><input type="text" id="q_fornita" placeholder="Pezzi / Peso Forniti"></div>
+        <div class="form-group"><label>Quantità Scarto:</label><input type="text" id="q_scarto" placeholder="Pezzi / Peso Scartati"></div>
+        <div class="form-group"><label>Numero Fattura:</label><input type="text" id="n_fattura" placeholder="Numero Fattura"></div>
+        <div class="form-group"><label>Data Fattura:</label><input type="text" id="data_fattura" placeholder="GG/MM/AAAA"></div>
+        <div class="form-group"><label>Intercettazione:</label><input type="text" id="intercettazione" placeholder="Es. Controllo Ingressi"></div>
+        <div class="form-group"><label>Ordine Cliente:</label><input type="text" id="ordine_cliente" placeholder="Riferimento Cliente"></div>
+        <div class="form-group"><label>Posizione Cliente:</label><input type="text" id="posizione_cliente" placeholder="Posizione Ordine Cliente"></div>
+    </div>
+
+    <div class="btn-container">
+        <button class="btn-add" onclick="elaboraNC()">Genera PDF e Metti in Attesa</button>
+    </div>
+
+    <h3>🔍 Registro Attività Pendenti</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Data Segnalazione</th>
+                <th>NC</th>
+                <th>Fornitore</th>
+                <th>Dati Principali (SAP / Ordine)</th>
+                <th>Stato Attività</th>
+                <th style="width: 200px;">Azioni</th>
+            </tr>
+        </thead>
+        <tbody id="tabellaCorpo"></tbody>
+    </table>
+</div>
+
+<div id="sezioneStampaUfficiale"></div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", mostraRegistro);
+
+    function valoreForm(id) { return document.getElementById(id).value.trim() || "-"; }
+
+    function elaboraNC() {
+        const fornitore = document.getElementById('fornitore').value.trim();
+        if (!fornitore) { alert("Il campo Fornitore è obbligatorio."); return; }
+
+        const dataOggi = new Date().toLocaleDateString('it-IT');
+
+        const datiNC = {
+            id: Date.now(),
+            data_inserimento: dataOggi,
+            nc_num: valoreForm('nc_num'),
+            fornitore: fornitore,
+            odp: valoreForm('odp'),
+            sap_grezzo: valoreForm('sap_grezzo'),
+            sap_finito: valoreForm('sap_finito'),
+            oda: valoreForm('oda'),
+            posizione: valoreForm('posizione'),
+            colata: valoreForm('colata'),
+            q_fornita: valoreForm('q_fornita'),
+            q_scarto: valoreForm('q_scarto'),
+            n_fattura: valoreForm('n_fattura'),
+            data_fattura: valoreForm('data_fattura'),
+            intercettazione: valoreForm('intercettazione'),
+            ordine_cliente: valoreForm('ordine_cliente'),
+            posizione_cliente: valoreForm('posizione_cliente'),
+            stato: "PENDENTE"
+        };
+
+        // 1. Salva nel database locale (Funziona sempre su file locale)
+        let registro = JSON.parse(localStorage.getItem('db_maag_local')) || [];
+        registro.push(datiNC);
+        localStorage.setItem('db_maag_local', JSON.stringify(registro));
+
+        // 2. Forza l'aggiornamento della tabella visiva PRIMA della stampa
+        mostraRegistro();
+
+        // 3. Prepara il foglio pulito e avvia la stampa PDF
+        avviaProceduraStampa(datiNC);
+
+        // 4. Resetta i campi di testo per il prossimo inserimento
+        const inputs = document.querySelectorAll('.form-grid input');
+        inputs.forEach(input => input.value = '');
+    }
+
+    function mostraRegistro() {
+        const registro = JSON.parse(localStorage.getItem('db_maag_local')) || [];
+        const tbody = document.getElementById('tabellaCorpo');
+        tbody.innerHTML = "";
+
+        registro.sort((a, b) => (a.stato === 'PENDENTE' ? -1 : 1));
+
+        registro.forEach(item => {
+            const tr = document.createElement('tr');
+            if (item.stato === 'TERMINATA') tr.className = 'row-done';
+
+            tr.innerHTML = `
+                <td>${item.data_inserimento}</td>
+                <td><strong>${item.nc_num}</strong></td>
+                <td><strong>${item.fornitore}</strong></td>
+                <td>
+                    <small>
+                        <strong>SAP:</strong> G: ${item.sap_grezzo} | F: ${item.sap_finito}<br>
+                        <strong>Ordine:</strong> ${item.oda} (Pos: ${item.posizione})
+                    </small>
+                </td>
+                <td>
+                    <span class="${item.stato === 'PENDENTE' ? 'status-alert' : 'status-ok'} no-strike">
+                        ${item.stato === 'PENDENTE' ? '❌ In Attesa' : '✔️ Terminata'}
+                    </span>
+                </td>
+                <td class="no-strike">
+                    <button class="btn-download" onclick='ristampa(${JSON.stringify(item).replace(/'/g, "&apos;")})'>⬇️ PDF</button>
+                    ${item.stato === 'PENDENTE' ? `<button class="btn-done" onclick="chiudiAttivita(${item.id})">Fatto</button>` : ''}
+                    <button class="btn-del" onclick="eliminaRiga(${item.id})">🗑️</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function chiudiAttivita(id) {
+        let registro = JSON.parse(localStorage.getItem('db_maag_local'));
+        registro = registro.map(item => {
+            if (item.id === id) item.stato = 'TERMINATA';
+            return item;
+        });
+        localStorage.setItem('db_maag_local', JSON.stringify(registro));
+        mostraRegistro();
+    }
+
+    function eliminaRiga(id) {
+        if (confirm("Rimuovere la riga dal monitoraggio?")) {
+            let registro = JSON.parse(localStorage.getItem('db_maag_local'));
+            registro = registro.filter(item => item.id !== id);
+            localStorage.setItem('db_maag_local', JSON.stringify(registro));
+            mostraRegistro();
+        }
+    }
+
+    function avviaProceduraStampa(d) {
+        const areaStampa = document.getElementById('sezioneStampaUfficiale');
+
+        // Genera il layout strutturato del foglio senza abbreviazioni
+        areaStampa.innerHTML = `
+            <div class="print-header">MAAG — QUALITY CONTROL INCOMING</div>
+            <div class="print-title">RAPPORTO DI NON CONFORMITÀ (Data: ${d.data_inserimento})</div>
+            <table class="print-table">
+                <tr><td class="label">NC:</td><td>${d.nc_num}</td></tr>
+                <tr><td class="label">N° Ordine di produzione:</td><td>${d.odp}</td></tr>
+                <tr><td class="label">SAP Grezzo:</td><td>${d.sap_grezzo}</td></tr>
+                <tr><td class="label">SAP Finito:</td><td>${d.sap_finito}</td></tr>
+                <tr><td class="label">Ordine di acquisto:</td><td>${d.oda}</td></tr>
+                <tr><td class="label">Posizione:</td><td>${d.posizione}</td></tr>
+                <tr><td class="label">Colata:</td><td>${d.colata}</td></tr>
+                <tr><td class="label">Fornitore:</td><td>${d.fornitore}</td></tr>
+                <tr><td class="label">Quantità Fornita:</td><td>${d.q_fornita}</td></tr>
+                <tr><td class="label">Quantità Scarto:</td><td>${d.q_scarto}</td></tr>
+                <tr><td class="label">Numero Fattura:</td><td>${d.n_fattura}</td></tr>
+                <tr><td class="label">Data Fattura:</td><td>${d.data_fattura}</td></tr>
+                <tr><td class="label">Intercettazione:</td><td>${d.intercettazione}</td></tr>
+                <tr><td class="label">Ordine Cliente:</td><td>${d.ordine_cliente}</td></tr>
+                <tr><td class="label">Posizione Cliente:</td><td>${d.posizione_cliente}</td></tr>
+            </table>
+        `;
+
+        // Lancia il comando di stampa nativo della pagina
+        window.print();
+    }
+
+    function ristampa(item) {
+        avviaProceduraStampa(item);
+    }
+</script>
+
+</body>
+</html>
