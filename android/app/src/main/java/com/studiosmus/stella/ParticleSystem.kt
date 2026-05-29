@@ -11,7 +11,6 @@ import android.graphics.Shader
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
-import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.random.Random
 
@@ -78,140 +77,122 @@ object ParticleSystem {
      * Called every frame by the live wallpaper service.
      */
     internal fun drawTimeOverlay(canvas: Canvas, timeOfDay: TimeOfDay, w: Int, h: Int) {
+        // All overlays use a directional radial from the sun/moon HUD position so the
+        // scene looks lit FROM that corner, not from a flat vertical gradient.
+        val sx = w * HUD_X_FRAC;  val sy = h * HUD_Y_FRAC
         when (timeOfDay) {
-            TimeOfDay.DAWN        -> drawDawnOverlay(canvas, w, h)
-            TimeOfDay.MORNING     -> drawSolidOverlay(canvas, w, h, Color.rgb(255, 230, 140), 22)
-            TimeOfDay.AFTERNOON   -> { /* no tint - bright daylight */ }
-            TimeOfDay.GOLDEN_HOUR -> drawGoldenHourOverlay(canvas, w, h)
-            TimeOfDay.DUSK        -> drawDuskOverlay(canvas, w, h)
-            TimeOfDay.NIGHT       -> drawNightTintOverlay(canvas, w, h)
+            TimeOfDay.DAWN -> {
+                // Pre-sunrise: cool blue at top, warm blush radiating from sun corner
+                paint.shader = LinearGradient(0f, 0f, 0f, h.toFloat(),
+                    Color.argb(110, 15, 20, 70), Color.argb(0, 15, 20, 70), Shader.TileMode.CLAMP)
+                canvas.drawRect(0f, 0f, w.toFloat(), h.toFloat(), paint)
+                paint.shader = RadialGradient(sx, sy, w * 1.6f,
+                    Color.argb(80, 255, 110, 40), Color.TRANSPARENT, Shader.TileMode.CLAMP)
+                canvas.drawRect(0f, 0f, w.toFloat(), h.toFloat(), paint)
+                paint.shader = null
+            }
+            TimeOfDay.MORNING -> {
+                // Warm directional morning light from sun corner
+                paint.shader = RadialGradient(sx, sy, w * 1.4f,
+                    Color.argb(45, 255, 215, 80), Color.TRANSPARENT, Shader.TileMode.CLAMP)
+                canvas.drawRect(0f, 0f, w.toFloat(), h.toFloat(), paint)
+                paint.shader = null
+            }
+            TimeOfDay.AFTERNOON -> { /* clear bright daylight — sun handles it */ }
+            TimeOfDay.GOLDEN_HOUR -> {
+                // Strong warm directional from sun + complementary cool shadow in far corner
+                paint.shader = RadialGradient(sx, sy, w * 1.6f,
+                    Color.argb(85, 255, 120, 15), Color.TRANSPARENT, Shader.TileMode.CLAMP)
+                canvas.drawRect(0f, 0f, w.toFloat(), h.toFloat(), paint)
+                // Cool blue-purple opposite corner (lower left)
+                paint.shader = RadialGradient(0f, h.toFloat(), w * 0.8f,
+                    Color.argb(45, 50, 60, 140), Color.TRANSPARENT, Shader.TileMode.CLAMP)
+                canvas.drawRect(0f, 0f, w.toFloat(), h.toFloat(), paint)
+                paint.shader = null
+            }
+            TimeOfDay.DUSK -> {
+                // Reddish sun corner + violet-indigo spreading across sky
+                paint.shader = RadialGradient(sx, sy, w * 1.5f,
+                    Color.argb(90, 200, 50, 10), Color.TRANSPARENT, Shader.TileMode.CLAMP)
+                canvas.drawRect(0f, 0f, w.toFloat(), h.toFloat(), paint)
+                paint.shader = LinearGradient(0f, 0f, 0f, h.toFloat(),
+                    Color.argb(80, 50, 10, 90), Color.TRANSPARENT, Shader.TileMode.CLAMP)
+                canvas.drawRect(0f, 0f, w.toFloat(), h.toFloat(), paint)
+                paint.shader = null
+            }
+            TimeOfDay.NIGHT -> {
+                paint.shader = LinearGradient(0f, 0f, 0f, h.toFloat(),
+                    Color.argb(160, 4, 6, 32), Color.argb(100, 8, 12, 48), Shader.TileMode.CLAMP)
+                canvas.drawRect(0f, 0f, w.toFloat(), h.toFloat(), paint)
+                paint.shader = null
+            }
         }
     }
 
-    private fun drawDawnOverlay(canvas: Canvas, w: Int, h: Int) {
-        // Warm orange-pink horizon gradient
-        paint.shader = LinearGradient(0f, 0f, 0f, h.toFloat(),
-            Color.argb(0, 255, 100, 30),
-            Color.argb(90, 255, 120, 40),
-            Shader.TileMode.CLAMP)
-        canvas.drawRect(0f, 0f, w.toFloat(), h.toFloat(), paint)
-        paint.shader = null
-        // Slight blue-dark at top (pre-sunrise sky)
-        paint.shader = LinearGradient(0f, 0f, 0f, h * 0.35f,
-            Color.argb(80, 20, 30, 80), Color.TRANSPARENT, Shader.TileMode.CLAMP)
-        canvas.drawRect(0f, 0f, w.toFloat(), h * 0.35f, paint)
-        paint.shader = null
-    }
+    // ─── Fixed HUD sun/moon (upper-right sky) ────────────────────────────────────
 
-    private fun drawGoldenHourOverlay(canvas: Canvas, w: Int, h: Int) {
-        // Rich warm amber spreading from bottom
-        paint.shader = LinearGradient(0f, h * 0.3f, 0f, h.toFloat(),
-            Color.TRANSPARENT,
-            Color.argb(100, 255, 100, 10),
-            Shader.TileMode.CLAMP)
-        canvas.drawRect(0f, 0f, w.toFloat(), h.toFloat(), paint)
-        paint.shader = null
-        // Warm tint on the whole scene
-        drawSolidOverlay(canvas, w, h, Color.rgb(255, 90, 0), 40)
-    }
+    private val HUD_X_FRAC = 0.80f
+    private val HUD_Y_FRAC = 0.22f
+    private val HUD_R_FRAC = 0.055f
 
-    private fun drawDuskOverlay(canvas: Canvas, w: Int, h: Int) {
-        // Purple-blue at top, orange-red at bottom
-        paint.shader = LinearGradient(0f, 0f, 0f, h.toFloat(),
-            Color.argb(100, 40, 0, 80),
-            Color.argb(80, 200, 50, 10),
-            Shader.TileMode.CLAMP)
-        canvas.drawRect(0f, 0f, w.toFloat(), h.toFloat(), paint)
-        paint.shader = null
-    }
-
-    private fun drawNightTintOverlay(canvas: Canvas, w: Int, h: Int) {
-        // Deep blue-black vignette
-        paint.shader = LinearGradient(0f, 0f, 0f, h.toFloat(),
-            Color.argb(150, 4, 6, 30),
-            Color.argb(100, 8, 12, 45),
-            Shader.TileMode.CLAMP)
-        canvas.drawRect(0f, 0f, w.toFloat(), h.toFloat(), paint)
-        paint.shader = null
-    }
-
-    // ─── Fixed HUD sun/moon (upper-right sky, colour depends on time of day) ────
-
-    // Positioned clearly in the sky area, well below the status bar.
-    private val HUD_X_FRAC = 0.80f   // fraction of w for the disk centre
-    private val HUD_Y_FRAC = 0.22f   // fraction of h  (moved down from top)
-    private val HUD_R_FRAC = 0.055f  // disk radius as fraction of h (larger)
-
-    private data class SunStyle(
-        val diskCenter: Int, val diskEdge: Int,
-        val halo: Int, val atmosphere: Int,
-        val rayAlpha: Int, val nRays: Int
-    )
+    // disk = overexposed centre color, bloom = close glow, scatter = wide sky tint
+    private data class SunStyle(val disk: Int, val bloom: Int, val scatter: Int)
 
     private fun sunStyle(t: TimeOfDay) = when (t) {
         TimeOfDay.DAWN        -> SunStyle(
-            Color.argb(255, 255, 180,  80), Color.argb(230, 255,  90,  20),
-            Color.argb(90,  255, 110,  30), Color.argb(40,  255,  70,   0), 50, 6)
+            Color.argb(255, 255, 210, 120),
+            Color.argb(115, 255, 150,  50),
+            Color.argb(62,  255,  90,  10))
         TimeOfDay.MORNING     -> SunStyle(
-            Color.argb(255, 255, 255, 230), Color.argb(235, 255, 220,  90),
-            Color.argb(85,  255, 200,  70), Color.argb(35,  255, 180,  40), 70, 8)
+            Color.argb(255, 255, 255, 245),
+            Color.argb(100, 255, 230, 110),
+            Color.argb(40,  255, 200,  55))
         TimeOfDay.AFTERNOON   -> SunStyle(
-            Color.argb(255, 255, 255, 255), Color.argb(245, 255, 252, 210),
-            Color.argb(80,  255, 250, 180), Color.argb(28,  255, 248, 160), 80, 8)
+            Color.argb(255, 255, 255, 255),
+            Color.argb(85,  255, 255, 220),
+            Color.argb(28,  255, 255, 200))
         TimeOfDay.GOLDEN_HOUR -> SunStyle(
-            Color.argb(255, 255, 210,  80), Color.argb(235, 255, 120,  10),
-            Color.argb(95,  255, 100,   0), Color.argb(45,  220,  70,   0), 60, 8)
+            Color.argb(255, 255, 195,  70),
+            Color.argb(130, 255, 130,  10),
+            Color.argb(72,  235,  80,   0))
         TimeOfDay.DUSK        -> SunStyle(
-            Color.argb(230, 240, 100,  30), Color.argb(210, 200,  40,  10),
-            Color.argb(90,  180,  30,   0), Color.argb(42,  140,  15,   0), 42, 6)
-        TimeOfDay.NIGHT       -> SunStyle(0, 0, 0, 0, 0, 0)
+            Color.argb(235, 240,  90,  30),
+            Color.argb(115, 200,  50,  10),
+            Color.argb(65,  160,  25,   0))
+        TimeOfDay.NIGHT       -> SunStyle(0, 0, 0)
     }
 
     internal fun drawSun(canvas: Canvas, w: Int, h: Int, timeOfDay: TimeOfDay) {
-        val style = sunStyle(timeOfDay)
-        if (Color.alpha(style.diskCenter) == 0) return
+        val s = sunStyle(timeOfDay)
+        if (Color.alpha(s.disk) == 0) return
 
         val cx = w * HUD_X_FRAC
         val cy = h * HUD_Y_FRAC
         val r  = h * HUD_R_FRAC
 
-        // Wide atmospheric diffusion — bleeds across a large area of sky
-        paint.shader = RadialGradient(cx, cy, r * 20f,
-            style.atmosphere, Color.TRANSPARENT, Shader.TileMode.CLAMP)
+        // 1. Wide atmospheric scatter — warms the sky from the sun's direction
+        paint.shader = RadialGradient(cx, cy, r * 22f,
+            s.scatter, Color.TRANSPARENT, Shader.TileMode.CLAMP)
         canvas.drawRect(0f, 0f, w.toFloat(), h.toFloat(), paint)
 
-        // Corona halo
-        paint.shader = RadialGradient(cx, cy, r * 5.5f,
-            style.halo, Color.TRANSPARENT, Shader.TileMode.CLAMP)
-        canvas.drawRect(cx - r * 6f, cy - r * 6f, cx + r * 6f, cy + r * 6f, paint)
+        // 2. Close bloom — bright zone immediately around the disk
+        paint.shader = RadialGradient(cx, cy, r * 6f,
+            s.bloom, Color.TRANSPARENT, Shader.TileMode.CLAMP)
+        canvas.drawRect(cx - r * 7f, cy - r * 7f, cx + r * 7f, cy + r * 7f, paint)
         paint.shader = null
 
-        // Corona rays — alternating long/short for a natural starburst
-        if (style.rayAlpha > 0) {
-            paint.strokeCap = Paint.Cap.ROUND
-            paint.style = Paint.Style.STROKE
-            val total = style.nRays * 2
-            for (i in 0 until total) {
-                val angle  = i * (PI / total).toFloat()
-                val isLong = i % 2 == 0
-                val len    = r * (if (isLong) 2.6f else 1.4f)
-                val alpha  = if (isLong) style.rayAlpha else style.rayAlpha / 2
-                paint.color      = Color.argb(alpha, 255, 252, 210)
-                paint.strokeWidth = h * (if (isLong) 0.0024f else 0.0014f)
-                val ix = cos(angle); val iy = sin(angle)
-                canvas.drawLine(cx + ix * r * 1.3f, cy + iy * r * 1.3f,
-                                cx + ix * (r + len), cy + iy * (r + len), paint)
-            }
-            paint.style    = Paint.Style.FILL
-            paint.strokeCap = Paint.Cap.BUTT
-        }
-
-        // Disk with limb-darkening (brighter white centre → warm tinted rim)
-        paint.shader = RadialGradient(cx, cy, r,
-            intArrayOf(style.diskCenter, style.diskCenter, style.diskEdge),
-            floatArrayOf(0f, 0.45f, 1f),
+        // 3. Overexposed disk — white-hot core bleeding into disk color, no hard edge.
+        //    No rays: a real sun has no visible corona rays to the naked eye.
+        paint.shader = RadialGradient(cx, cy, r * 1.8f,
+            intArrayOf(
+                Color.argb(255, 255, 255, 255),
+                Color.argb(255, 255, 255, 255),
+                s.disk,
+                Color.TRANSPARENT
+            ),
+            floatArrayOf(0f, 0.42f, 0.72f, 1f),
             Shader.TileMode.CLAMP)
-        canvas.drawCircle(cx, cy, r, paint)
+        canvas.drawCircle(cx, cy, r * 1.8f, paint)
         paint.shader = null
     }
 
@@ -223,56 +204,82 @@ object ParticleSystem {
         val r  = h * HUD_R_FRAC
 
         val phase = moonPhase()
-        val lit   = ((1.0 - cos(phase * 2 * PI)) / 2.0).toFloat()   // 0=new, 1=full
+        val lit   = ((1.0 - cos(phase * 2 * PI)) / 2.0).toFloat()
 
-        // Atmospheric glow — scales with how much of the disk is illuminated
-        val glowA = (22 + lit * 70).toInt()
-        paint.shader = RadialGradient(cx, cy, r * 8f,
-            Color.argb(glowA, 195, 215, 255), Color.TRANSPARENT, Shader.TileMode.CLAMP)
-        canvas.drawRect(cx - r * 9f, cy - r * 9f, cx + r * 9f, cy + r * 9f, paint)
+        // 1. Cold blue-silver sky glow — scales with illumination
+        val glowA = (20 + lit * 75).toInt()
+        paint.shader = RadialGradient(cx, cy, r * 9f,
+            Color.argb(glowA, 185, 205, 255), Color.TRANSPARENT, Shader.TileMode.CLAMP)
+        canvas.drawRect(cx - r * 10f, cy - r * 10f, cx + r * 10f, cy + r * 10f, paint)
         paint.shader = null
 
-        // Unlit disk — earthshine: very faint cold blue (visible on new/crescent moon)
+        // 2. Dark disk — real lunar albedo ~12%: the moon is dark gray, not white
         paint.shader = RadialGradient(cx, cy, r,
-            Color.argb(60, 45, 60, 100), Color.argb(90, 28, 38, 75),
+            Color.argb(215, 38, 42, 55), Color.argb(235, 22, 26, 40),
             Shader.TileMode.CLAMP)
         canvas.drawCircle(cx, cy, r, paint)
         paint.shader = null
 
-        // Lit portion — realistic grayish-white lunar surface
+        // 3. Earthshine — faint blue on the unlit side (visible in real crescent moons)
+        if (lit < 0.7f) {
+            val esAlpha = ((1f - lit) * 28).toInt()
+            paint.color = Color.argb(esAlpha, 80, 110, 180)
+            canvas.drawCircle(cx, cy, r, paint)
+        }
+
+        // 4. Lit surface — light gray with radial shading, NOT white
         val litPath = moonLitPath(cx, cy, r, phase)
         paint.shader = RadialGradient(cx, cy, r,
             intArrayOf(
-                Color.argb(245, 255, 255, 252),
-                Color.argb(230, 235, 238, 245),
-                Color.argb(210, 210, 218, 232)
+                Color.argb(245, 210, 215, 222),
+                Color.argb(230, 185, 192, 205),
+                Color.argb(210, 155, 165, 180)
             ),
             floatArrayOf(0f, 0.55f, 1f),
             Shader.TileMode.CLAMP)
         canvas.drawPath(litPath, paint)
         paint.shader = null
 
-        // Crater detail (visible only when enough surface is lit)
-        if (lit > 0.12f) {
+        // 5. Thin bright rim on the sunlit limb
+        if (lit > 0.04f) {
             canvas.save()
             canvas.clipPath(litPath)
-            val craterA = (lit * 38).toInt()
+            paint.color = Color.argb((lit * 90).toInt(), 238, 245, 255)
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = r * 0.07f
+            canvas.drawCircle(cx, cy, r * 0.96f, paint)
+            paint.style = Paint.Style.FILL
+            canvas.restore()
+        }
+
+        // 6. Maria (dark patches) + craters — only visible on lit surface
+        if (lit > 0.10f) {
+            canvas.save()
+            canvas.clipPath(litPath)
+            val craterA = (lit * 50).toInt()
+            // Maria: large diffuse dark patches that give the moon its "face"
             listOf(
-                Triple(-0.20f, -0.26f, 0.11f),
-                Triple( 0.30f,  0.14f, 0.09f),
-                Triple(-0.07f,  0.34f, 0.10f),
-                Triple( 0.12f, -0.40f, 0.07f),
-                Triple(-0.38f,  0.20f, 0.06f)
+                Triple( 0.10f, -0.05f, 0.32f),
+                Triple(-0.22f,  0.18f, 0.22f)
             ).forEach { (dx, dy, rFrac) ->
-                // Crater shadow
-                paint.color = Color.argb(craterA, 148, 162, 188)
+                paint.color = Color.argb(craterA / 2, 110, 118, 135)
                 canvas.drawCircle(cx + r * dx, cy + r * dy, r * rFrac, paint)
-                // Crater rim highlight
-                paint.color = Color.argb(craterA / 3, 225, 232, 248)
+            }
+            // Craters: dark bowl + ejecta rim highlight
+            listOf(
+                Triple(-0.18f, -0.28f, 0.09f),
+                Triple( 0.32f,  0.16f, 0.08f),
+                Triple(-0.06f,  0.36f, 0.09f),
+                Triple( 0.14f, -0.42f, 0.06f),
+                Triple(-0.40f,  0.22f, 0.05f)
+            ).forEach { (dx, dy, rFrac) ->
+                paint.color = Color.argb(craterA, 125, 135, 155)
+                canvas.drawCircle(cx + r * dx, cy + r * dy, r * rFrac, paint)
+                paint.color = Color.argb(craterA / 3, 228, 235, 248)
                 canvas.drawCircle(
-                    cx + r * (dx - rFrac * 0.35f),
-                    cy + r * (dy - rFrac * 0.35f),
-                    r * rFrac * 0.65f, paint)
+                    cx + r * (dx - rFrac * 0.4f),
+                    cy + r * (dy - rFrac * 0.4f),
+                    r * rFrac * 0.55f, paint)
             }
             canvas.restore()
         }
