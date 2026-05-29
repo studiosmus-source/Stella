@@ -18,8 +18,12 @@
         .form-group label { font-size: 13px; font-weight: bold; color: #323130; margin-bottom: 6px; }
         .form-group input { padding: 10px; border: 1px solid #a19f9d; border-radius: 4px; font-size: 13px; }
 
-        .btn-container { text-align: right; margin-top: 20px; margin-bottom: 30px; }
-        .btn-save { background-color: #e8a020; color: white; border: none; padding: 12px 24px; font-weight: bold; border-radius: 4px; cursor: pointer; font-size: 14px; }
+        .btn-container { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 20px; margin-bottom: 30px; }
+        .btn-save  { background-color: #e8a020; color: white; border: none; padding: 12px 24px; font-weight: bold; border-radius: 4px; cursor: pointer; font-size: 14px; }
+        .btn-sync  { background-color: #0078d4; color: white; border: none; padding: 10px 18px; font-weight: bold; border-radius: 4px; cursor: pointer; font-size: 13px; }
+        .btn-export { background-color: #107c41; color: white; border: none; padding: 10px 18px; font-weight: bold; border-radius: 4px; cursor: pointer; font-size: 13px; }
+        .sync-bar { background: #f0f6ff; border: 1px solid #c7e0f4; border-radius: 4px; padding: 10px 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; font-size: 13px; }
+        .sync-bar span { color: #323130; }
 
         #toast { display: none; background: #107c41; color: white; padding: 10px 18px; border-radius: 4px; font-weight: bold; font-size: 13px; margin-right: 12px; }
 
@@ -93,6 +97,12 @@
     </div>
 
     <h3>Registro Attivit&agrave;</h3>
+    <div class="sync-bar">
+        <strong>Cartella condivisa:</strong>
+        <span id="syncStatus">Nessun file caricato — i dati sono solo su questo PC</span>
+        <button class="btn-sync"   id="btnCarica">&#128194; Carica dati</button>
+        <button class="btn-export" id="btnSalvaFile">&#128190; Salva dati</button>
+    </div>
     <table>
         <thead>
             <tr>
@@ -306,6 +316,44 @@
         return '<div class="ph-row"><div class="ph-label">' + label + '</div><div class="ph-val">' + testo + '</div></div>';
     }
 
+    /* ── CONDIVISIONE FILE ── */
+    function caricaDaFile() {
+        var input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        input.onchange = function(e) {
+            var file = e.target.files[0];
+            if (!file) return;
+            var reader = new FileReader();
+            reader.onload = function(ev) {
+                try {
+                    var db = JSON.parse(ev.target.result);
+                    if (!Array.isArray(db)) throw new Error('Formato non valido');
+                    salvaDB(db);
+                    mostraRegistro();
+                    document.getElementById('syncStatus').innerHTML = '<strong style="color:#107c41">&#10003; Caricato:</strong> ' + file.name + ' (' + db.length + ' NC)';
+                } catch(err) {
+                    alert('Errore nel file: ' + err.message);
+                }
+            };
+            reader.readAsText(file);
+        };
+        input.click();
+    }
+
+    function salvasuFile() {
+        var db = caricaDB();
+        var json = JSON.stringify(db, null, 2);
+        var blob = new Blob([json], { type: 'application/json' });
+        var url  = URL.createObjectURL(blob);
+        var a    = document.createElement('a');
+        a.href     = url;
+        a.download = 'registro_nc.json';
+        a.click();
+        URL.revokeObjectURL(url);
+        document.getElementById('syncStatus').innerHTML = '<strong style="color:#107c41">&#10003; Salvato:</strong> registro_nc.json — mettilo nella cartella condivisa';
+    }
+
     // Init
     var btnSalva = document.getElementById('btnSalva');
     if (btnSalva) {
@@ -314,12 +362,8 @@
         alert('ERRORE: pulsante non trovato. Segnala questo messaggio.');
     }
 
-    try {
-        localStorage.setItem('_test', '1');
-        localStorage.removeItem('_test');
-    } catch(e) {
-        alert('ATTENZIONE: il salvataggio dati non e\' disponibile in questo browser/modalita\'. Prova ad aprire il file direttamente da Chrome (trascina il file nel browser).');
-    }
+    document.getElementById('btnCarica').onclick   = caricaDaFile;
+    document.getElementById('btnSalvaFile').onclick = salvasuFile;
 
     mostraRegistro();
 </script>
