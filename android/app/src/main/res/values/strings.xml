@@ -16,4 +16,5 @@
     <string name="wallpaper_description">Sfondo animato con effetti meteo in tempo reale</string>
     <string name="main_subtitle">Scegli uno sfondo: pioggia, neve e luce cambieranno live</string>
     <string name="btn_set_wallpaper">Imposta come sfondo live</string>
+    <string name="btn_test_weather">Simula condizioni meteo</string>
 </resources>

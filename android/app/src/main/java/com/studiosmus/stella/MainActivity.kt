@@ -33,10 +33,6 @@ class MainActivity : AppCompatActivity() {
     private var savedImagePath: String? = null
     private var cachedWeather: WeatherData? = null
 
-    // Secret: 7 taps on the title within 3 seconds opens the debug panel
-    private var tapCount   = 0
-    private var lastTapMs  = 0L
-
     private val photoPicker = registerForActivityResult(
         ActivityResultContracts.PickVisualMedia()
     ) { uri -> uri?.let { handleImageUri(it) } }
@@ -68,14 +64,7 @@ class MainActivity : AppCompatActivity() {
         binding.btnPickImage.setOnClickListener { pickImage() }
         binding.btnSetWallpaper.setOnClickListener { setLiveWallpaper() }
         binding.btnSetWallpaper.isEnabled = savedImagePath != null
-
-        // Secret tap sequence: 7 taps on title within 3 s → debug panel
-        binding.tvTitle.setOnClickListener {
-            val now = System.currentTimeMillis()
-            if (now - lastTapMs > 3000L) tapCount = 0
-            lastTapMs = now
-            if (++tapCount >= 7) { tapCount = 0; showDebugDialog() }
-        }
+        binding.btnTestWeather.setOnClickListener { showDebugDialog() }
 
         requestLocationAndLoad()
     }
