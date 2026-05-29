@@ -39,6 +39,12 @@ object ParticleSystem {
                 drawRain(canvas, w, h, 1.0f, seed)
                 drawLightning(canvas, w, h, seed)
             }
+            WeatherCondition.HAIL                -> {
+                drawDarkOverlay(canvas, w, h, 95)
+                drawRain(canvas, w, h, 0.7f, seed)
+                drawHail(canvas, w, h, seed)
+                drawLightning(canvas, w, h, seed)
+            }
         }
     }
 
@@ -273,6 +279,25 @@ object ParticleSystem {
             val nx = x + (rng.nextFloat() - 0.5f) * 50f
             val ny = y + rng.nextFloat() * 45f + 20f
             canvas.drawLine(x, y, nx, ny, paint); x = nx; y = ny
+        }
+    }
+
+    private fun drawHail(canvas: Canvas, w: Int, h: Int, seed: Long) {
+        val rng = Random(seed xor 0xA3C1F7L)
+        val count = (w * h / 6000)
+        val sinA = sin(Math.toRadians(10.0)).toFloat()
+        repeat(count) {
+            val x = rng.nextFloat() * w
+            val y = rng.nextFloat() * h
+            val r = rng.nextFloat() * 4.5f + 1.5f
+            val a = (rng.nextFloat() * 100 + 130).toInt()
+            paint.color = Color.argb(a, 195, 215, 240)
+            canvas.drawCircle(x + r * sinA, y, r, paint)
+            // Specular
+            if (r > 3.5f) {
+                paint.color = Color.argb(a / 3, 255, 255, 255)
+                canvas.drawCircle(x - r * 0.28f, y - r * 0.30f, r * 0.26f, paint)
+            }
         }
     }
 

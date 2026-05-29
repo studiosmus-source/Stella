@@ -146,6 +146,75 @@ class FogSystem(private val w: Int, private val h: Int) {
     }
 }
 
+// ─── Hail: icy pellets, 3 depth layers ──────────────────────────────────────
+
+class HailSystem(private val w: Int, private val h: Int) {
+
+    private inner class HailLayer(
+        count: Int,
+        speedMin: Float, speedMax: Float,
+        rMin: Float, rMax: Float,
+        val alphaMin: Int, val alphaMax: Int,
+        windDeg: Double
+    ) {
+        val x      = FloatArray(count) { Random.nextFloat() * w }
+        val y      = FloatArray(count) { Random.nextFloat() * h }
+        val speed  = FloatArray(count) { Random.nextFloat() * (speedMax - speedMin) + speedMin }
+        val radius = FloatArray(count) { Random.nextFloat() * (rMax - rMin) + rMin }
+        val alpha  = IntArray(count) { alphaMin + Random.nextInt((alphaMax - alphaMin).coerceAtLeast(1)) }
+        val n      = count
+        val sinA   = sin(Math.toRadians(windDeg)).toFloat()
+        val cosA   = cos(Math.toRadians(windDeg)).toFloat()
+        val paint  = Paint(Paint.ANTI_ALIAS_FLAG)
+        val shine  = Paint(Paint.ANTI_ALIAS_FLAG)
+
+        fun update(dt: Float, mult: Float) {
+            for (i in 0 until n) {
+                y[i] += speed[i] * dt * mult * cosA
+                x[i] += speed[i] * dt * mult * sinA
+                if (y[i] > h + radius[i]) {
+                    y[i] = -radius[i]
+                    x[i] = Random.nextFloat() * w
+                }
+            }
+        }
+
+        fun draw(canvas: Canvas, intensity: Float) {
+            val draw = (n * intensity).toInt().coerceAtMost(n)
+            for (i in 0 until draw) {
+                // Ice pellet body: cool blue-white
+                paint.color = Color.argb(alpha[i], 195, 215, 240)
+                canvas.drawCircle(x[i], y[i], radius[i], paint)
+                // Specular highlight on larger pellets
+                if (radius[i] > 3.5f) {
+                    shine.color = Color.argb(alpha[i] / 3, 255, 255, 255)
+                    canvas.drawCircle(
+                        x[i] - radius[i] * 0.30f, y[i] - radius[i] * 0.32f,
+                        radius[i] * 0.26f, shine
+                    )
+                }
+            }
+        }
+    }
+
+    // Near-vertical fall (10° wind), three depth layers
+    private val far  = HailLayer(w / 11, 400f,  750f, 1.5f, 3f,  60, 115, 10.0)
+    private val mid  = HailLayer(w /  8, 750f, 1200f, 3f,   5.5f, 130, 185, 10.0)
+    private val near = HailLayer(w / 13, 1100f, 1700f, 5.5f, 9f, 185, 240, 10.0)
+
+    fun update(dt: Float, speedMult: Float = 1f) {
+        far.update(dt, speedMult * 0.38f)
+        mid.update(dt, speedMult * 0.68f)
+        near.update(dt, speedMult)
+    }
+
+    fun draw(canvas: Canvas, intensity: Float) {
+        far.draw(canvas, intensity)
+        mid.draw(canvas, intensity)
+        near.draw(canvas, intensity * 0.72f)
+    }
+}
+
 // ─── Lightning with branching glow ───────────────────────────────────────────
 
 class LightningSystem(private val w: Int, private val h: Int) {

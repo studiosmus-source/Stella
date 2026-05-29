@@ -45,12 +45,13 @@ class StellaWallpaperService : WallpaperService() {
         }
 
         // ── Animated particle systems ────────────────────────────────────────
-        private var rain:      RainSystem?      = null
-        private var snow:      SnowSystem?      = null
-        private var fog:       FogSystem?       = null
-        private var lightning: LightningSystem? = null
-        private var clouds:    CloudSystem?     = null
+        private var rain:       RainSystem?      = null
+        private var snow:       SnowSystem?      = null
+        private var fog:        FogSystem?       = null
+        private var lightning:  LightningSystem? = null
+        private var clouds:     CloudSystem?     = null
         private var glassDrops: GlassDropSystem? = null
+        private var hail:       HailSystem?      = null
 
         private val drawRunnable = object : Runnable {
             override fun run() {
@@ -124,6 +125,7 @@ class StellaWallpaperService : WallpaperService() {
             lightning  = LightningSystem(w, h)
             clouds     = CloudSystem(w, h)
             glassDrops = GlassDropSystem(w, h)
+            hail       = HailSystem(w, h)
         }
 
         private fun fetchWeather() {
@@ -216,7 +218,12 @@ class StellaWallpaperService : WallpaperService() {
                 }
                 WeatherCondition.THUNDERSTORM -> {
                     rain?.update(dt, 1.8f); rain?.draw(canvas, 1.0f)
-                    lightning?.let { if (it.maybeStrike()) Unit; it.draw(canvas) }
+                    lightning?.let { it.maybeStrike(); it.draw(canvas) }
+                }
+                WeatherCondition.HAIL -> {
+                    rain?.update(dt, 1.2f); rain?.draw(canvas, 0.7f)
+                    hail?.update(dt); hail?.draw(canvas, 1.0f)
+                    lightning?.let { it.maybeStrike(); it.draw(canvas) }
                 }
                 WeatherCondition.FOG -> {
                     fog?.update(dt); fog?.draw(canvas, 1.0f)
@@ -243,6 +250,7 @@ class StellaWallpaperService : WallpaperService() {
             WeatherCondition.HEAVY_RAIN                                 -> 1.00f to 0.72f
             WeatherCondition.SNOW, WeatherCondition.HEAVY_SNOW          -> 0.80f to 0.05f
             WeatherCondition.THUNDERSTORM                               -> 1.00f to 1.00f
+            WeatherCondition.HAIL                                       -> 1.00f to 0.90f
             WeatherCondition.FOG                                        -> 0.30f to 0.10f
         }
 
@@ -251,6 +259,7 @@ class StellaWallpaperService : WallpaperService() {
             WeatherCondition.RAIN         -> 0.75f
             WeatherCondition.HEAVY_RAIN   -> 1.00f
             WeatherCondition.THUNDERSTORM -> 1.00f
+            WeatherCondition.HAIL         -> 0.65f
             else                          -> 0.00f
         }
     }

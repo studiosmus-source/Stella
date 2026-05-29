@@ -22,7 +22,8 @@ enum class WeatherCondition {
     DRIZZLE,
     RAIN, HEAVY_RAIN,
     SNOW, HEAVY_SNOW,
-    THUNDERSTORM;
+    THUNDERSTORM,
+    HAIL;
 
     val label: String
         get() = when (this) {
@@ -36,6 +37,7 @@ enum class WeatherCondition {
             SNOW -> "Neve"
             HEAVY_SNOW -> "Neve intensa"
             THUNDERSTORM -> "Temporale"
+            HAIL -> "Grandine"
         }
 
     companion object {
@@ -49,7 +51,8 @@ enum class WeatherCondition {
             65, 82 -> HEAVY_RAIN
             71, 73, 77, 85 -> SNOW
             75, 86 -> HEAVY_SNOW
-            95, 96, 99 -> THUNDERSTORM
+            95 -> THUNDERSTORM
+            96, 99 -> HAIL
             else -> if (isDay) CLEAR_DAY else CLEAR_NIGHT
         }
     }

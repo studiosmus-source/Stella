@@ -71,6 +71,7 @@ object WeatherRenderer {
             WeatherCondition.HEAVY_RAIN -> { rs = 0.65f; gs = 0.70f; bs = 0.88f; rt = -20f; gt = -14f; bt = 15f }
             WeatherCondition.SNOW, WeatherCondition.HEAVY_SNOW -> { rs = 0.88f; gs = 0.90f; bs = 0.98f; rt = 18f; gt = 18f; bt = 25f }
             WeatherCondition.THUNDERSTORM -> { rs = 0.55f; gs = 0.60f; bs = 0.72f; rt = -25f; gt = -18f; bt = -5f }
+            WeatherCondition.HAIL -> { rs = 0.60f; gs = 0.65f; bs = 0.78f; rt = -20f; gt = -14f; bt = -2f }
             WeatherCondition.FOG -> { rs = 0.68f; gs = 0.70f; bs = 0.72f; rt = 45f; gt = 45f; bt = 48f }
             WeatherCondition.OVERCAST -> { rs = 0.80f; gs = 0.82f; bs = 0.85f; rt = -5f; gt = -3f; bt = 0f }
             WeatherCondition.CLEAR_NIGHT -> { rs = 0.28f; gs = 0.32f; bs = 0.55f; rt = -8f; gt = -5f; bt = 12f }
