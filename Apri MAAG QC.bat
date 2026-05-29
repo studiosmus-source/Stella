@@ -1,2 +1,2 @@
 @echo off
-start chrome "http://10.202.168.146:5000"
+start msedge "http://10.202.168.146:5000"
