@@ -133,7 +133,7 @@ object ParticleSystem {
 
     private val HUD_X_FRAC = 0.80f
     private val HUD_Y_FRAC = 0.22f
-    private val HUD_R_FRAC = 0.055f
+    private val HUD_R_FRAC = 0.038f   // ridotto: sole/luna più piccoli e realistici
 
     // disk = overexposed centre color, bloom = close glow, scatter = wide sky tint
     private data class SunStyle(val disk: Int, val bloom: Int, val scatter: Int)
@@ -375,7 +375,7 @@ object ParticleSystem {
 
     internal fun drawNightOverlay(canvas: Canvas, w: Int, h: Int, seed: Long, horizonFrac: Float = 0.40f) {
         val rng   = Random(seed / 60)
-        val count = w * h / 3200
+        val count = w * h / 7000   // meno stelle, cielo meno affollato
         val skyH  = h * horizonFrac.coerceAtMost(0.75f)  // stars only above horizon
         val twinkle = ((System.currentTimeMillis() % 4000L) / 4000f) * 2 * Math.PI.toFloat()
         repeat(count) {

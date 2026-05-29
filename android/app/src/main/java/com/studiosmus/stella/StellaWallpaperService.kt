@@ -234,13 +234,15 @@ class StellaWallpaperService : WallpaperService() {
                     snow?.update(dt); snow?.draw(canvas, 1.0f)
                 }
                 WeatherCondition.THUNDERSTORM -> {
-                    rain?.update(dt, 1.8f); rain?.draw(canvas, 1.0f)
-                    lightning?.let { it.maybeStrike(); it.draw(canvas) }
+                    // Pioggia violentissima + fulmini frequenti e doppi
+                    rain?.update(dt, 2.4f); rain?.draw(canvas, 1.0f)
+                    lightning?.let { it.maybeStrike(1200, 3200, bolts = 2); it.draw(canvas) }
                 }
                 WeatherCondition.HAIL -> {
-                    rain?.update(dt, 1.2f); rain?.draw(canvas, 0.7f)
-                    hail?.update(dt); hail?.draw(canvas, 1.0f)
-                    lightning?.let { it.maybeStrike(); it.draw(canvas) }
+                    // Pioggia intensa + grandine grossa + fulmini
+                    rain?.update(dt, 1.9f); rain?.draw(canvas, 1.0f)
+                    hail?.update(dt, 1.4f); hail?.draw(canvas, 1.0f)
+                    lightning?.let { it.maybeStrike(2000, 5000); it.draw(canvas) }
                 }
                 WeatherCondition.FOG -> {
                     fog?.update(dt); fog?.draw(canvas, 1.0f)

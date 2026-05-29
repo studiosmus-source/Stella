@@ -293,9 +293,9 @@ class HailSystem(private val w: Int, private val h: Int) {
         }
     }
 
-    private val far  = HailLayer(w / 11, 400f,   750f, 1.5f, 3f,   60,  115, 10.0, 0.06f)
-    private val mid  = HailLayer(w /  8, 750f,  1200f, 3f,   5.5f, 130, 185, 10.0, 0.10f)
-    private val near = HailLayer(w / 13, 1100f, 1700f, 5.5f, 9f,   185, 240, 10.0, 0.14f)
+    private val far  = HailLayer(w /  9,  650f,  1100f, 2f,   4.5f,  75, 135, 12.0, 0.06f)
+    private val mid  = HailLayer(w /  6, 1150f,  1800f, 4f,   7.5f, 145, 205, 12.0, 0.10f)
+    private val near = HailLayer(w /  9, 1600f,  2600f, 8f,  13f,   200, 255, 12.0, 0.14f)
 
     fun update(dt: Float, speedMult: Float = 1f) {
         field.advance(dt)
@@ -314,16 +314,19 @@ class HailSystem(private val w: Int, private val h: Int) {
 // ─── Lightning with branching glow ───────────────────────────────────────────
 
 class LightningSystem(private val w: Int, private val h: Int) {
-    private val boltPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = 3f }
-    private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = 12f }
+    private val boltPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = 3.5f }
+    private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = 18f }
     private var lastBoltTime = 0L
-    private var boltSeed = 0L
+    private var boltSeed     = 0L
+    private var boltCount    = 1
 
-    fun maybeStrike(): Boolean {
+    /** minMs/maxMs = intervallo tra i fulmini; bolts = quanti scoccare insieme */
+    fun maybeStrike(minMs: Long = 3000, maxMs: Long = 8000, bolts: Int = 1): Boolean {
         val now = System.currentTimeMillis()
-        if (now - lastBoltTime > Random.nextLong(3000, 8000)) {
+        if (now - lastBoltTime > Random.nextLong(minMs, maxMs)) {
             lastBoltTime = now
-            boltSeed = now
+            boltSeed     = now
+            boltCount    = bolts
             return true
         }
         return false
@@ -332,15 +335,18 @@ class LightningSystem(private val w: Int, private val h: Int) {
     fun draw(canvas: Canvas) {
         val now = System.currentTimeMillis()
         val age = now - lastBoltTime
-        if (age > 300) return
+        if (age > 450) return   // fulmine visibile più a lungo
 
-        val alpha = (1f - age / 300f).coerceIn(0f, 1f)
-        canvas.drawColor(Color.argb((40 * alpha).toInt(), 255, 255, 210))
+        val alpha = (1f - age / 450f).coerceIn(0f, 1f)
+        // Flash luminoso sullo schermo
+        canvas.drawColor(Color.argb((75 * alpha).toInt(), 255, 255, 225))
 
         val rng = Random(boltSeed)
-        drawBolt(canvas, rng, alpha,
-            w * (0.2f + rng.nextFloat() * 0.6f), 0f,
-            w * (0.3f + rng.nextFloat() * 0.4f), h * 0.6f, 4)
+        repeat(boltCount) {
+            drawBolt(canvas, rng, alpha,
+                w * (0.15f + rng.nextFloat() * 0.70f), 0f,
+                w * (0.25f + rng.nextFloat() * 0.50f), h * 0.70f, 5)
+        }
     }
 
     private fun drawBolt(
@@ -348,23 +354,24 @@ class LightningSystem(private val w: Int, private val h: Int) {
         x1: Float, y1: Float, x2: Float, y2: Float, depth: Int
     ) {
         if (depth == 0) return
-        val mx = (x1 + x2) / 2f + (rng.nextFloat() - 0.5f) * 80f
-        val my = (y1 + y2) / 2f + (rng.nextFloat() - 0.5f) * 20f
-        glowPaint.color = Color.argb((30 * alpha).toInt(), 200, 220, 255)
+        val mx = (x1 + x2) / 2f + (rng.nextFloat() - 0.5f) * 95f
+        val my = (y1 + y2) / 2f + (rng.nextFloat() - 0.5f) * 28f
+        glowPaint.color = Color.argb((55 * alpha).toInt(), 210, 230, 255)
         canvas.drawLine(x1, y1, mx, my, glowPaint)
         canvas.drawLine(mx, my, x2, y2, glowPaint)
-        boltPaint.color = Color.argb((220 * alpha).toInt(), 255, 255, 200)
+        boltPaint.color = Color.argb((245 * alpha).toInt(), 255, 255, 210)
         canvas.drawLine(x1, y1, mx, my, boltPaint)
         canvas.drawLine(mx, my, x2, y2, boltPaint)
         drawBolt(canvas, rng, alpha, x1, y1, mx, my, depth - 1)
         drawBolt(canvas, rng, alpha, mx, my, x2, y2, depth - 1)
-        if (rng.nextFloat() > 0.55f && depth > 1) {
-            val bx = mx + (rng.nextFloat() - 0.3f) * 120f
-            val by = my + rng.nextFloat() * 150f
-            boltPaint.color = Color.argb((120 * alpha).toInt(), 255, 255, 200)
-            boltPaint.strokeWidth = 1.5f
+        // Più rami secondari
+        if (rng.nextFloat() > 0.42f && depth > 1) {
+            val bx = mx + (rng.nextFloat() - 0.3f) * 160f
+            val by = my + rng.nextFloat() * 200f
+            boltPaint.color = Color.argb((150 * alpha).toInt(), 255, 255, 210)
+            boltPaint.strokeWidth = 2f
             canvas.drawLine(mx, my, bx, by, boltPaint)
-            boltPaint.strokeWidth = 3f
+            boltPaint.strokeWidth = 3.5f
         }
     }
 }
