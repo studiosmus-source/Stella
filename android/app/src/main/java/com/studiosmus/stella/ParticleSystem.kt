@@ -135,107 +135,144 @@ object ParticleSystem {
         paint.shader = null
     }
 
-    // ─── Fixed HUD sun (top-right, colour depends on time of day) ────────────
+    // ─── Fixed HUD sun/moon (upper-right sky, colour depends on time of day) ────
 
-    // Sun/moon share the same top-right anchor so they never overlap ground.
-    private val HUD_X_FRAC = 0.84f   // fraction of w for the disk centre
-    private val HUD_Y_FRAC = 0.09f   // fraction of h
-    private val HUD_R_FRAC = 0.038f  // disk radius as fraction of h
+    // Positioned clearly in the sky area, well below the status bar.
+    private val HUD_X_FRAC = 0.80f   // fraction of w for the disk centre
+    private val HUD_Y_FRAC = 0.22f   // fraction of h  (moved down from top)
+    private val HUD_R_FRAC = 0.055f  // disk radius as fraction of h (larger)
 
     private data class SunStyle(
-        val disk:   Int, val inner: Int, val outer: Int,
+        val diskCenter: Int, val diskEdge: Int,
+        val halo: Int, val atmosphere: Int,
         val rayAlpha: Int, val nRays: Int
     )
 
     private fun sunStyle(t: TimeOfDay) = when (t) {
-        TimeOfDay.DAWN        -> SunStyle(Color.argb(200, 255, 110,  40), Color.argb(75, 255,  90,  20), Color.argb(32, 255,  70,   0), 38, 6)
-        TimeOfDay.MORNING     -> SunStyle(Color.argb(215, 255, 225, 120), Color.argb(70, 255, 200,  80), Color.argb(28, 255, 180,  50), 55, 8)
-        TimeOfDay.AFTERNOON   -> SunStyle(Color.argb(225, 255, 252, 235), Color.argb(65, 255, 248, 210), Color.argb(22, 255, 250, 190), 65, 8)
-        TimeOfDay.GOLDEN_HOUR -> SunStyle(Color.argb(210, 255, 145,  30), Color.argb(80, 255, 110,   0), Color.argb(38, 255,  80,   0), 45, 8)
-        TimeOfDay.DUSK        -> SunStyle(Color.argb(185, 215,  55,  20), Color.argb(75, 190,  35,  10), Color.argb(36, 165,  20,   0), 32, 6)
-        TimeOfDay.NIGHT       -> SunStyle(0, 0, 0, 0, 0)  // not drawn
+        TimeOfDay.DAWN        -> SunStyle(
+            Color.argb(255, 255, 180,  80), Color.argb(230, 255,  90,  20),
+            Color.argb(90,  255, 110,  30), Color.argb(40,  255,  70,   0), 50, 6)
+        TimeOfDay.MORNING     -> SunStyle(
+            Color.argb(255, 255, 255, 230), Color.argb(235, 255, 220,  90),
+            Color.argb(85,  255, 200,  70), Color.argb(35,  255, 180,  40), 70, 8)
+        TimeOfDay.AFTERNOON   -> SunStyle(
+            Color.argb(255, 255, 255, 255), Color.argb(245, 255, 252, 210),
+            Color.argb(80,  255, 250, 180), Color.argb(28,  255, 248, 160), 80, 8)
+        TimeOfDay.GOLDEN_HOUR -> SunStyle(
+            Color.argb(255, 255, 210,  80), Color.argb(235, 255, 120,  10),
+            Color.argb(95,  255, 100,   0), Color.argb(45,  220,  70,   0), 60, 8)
+        TimeOfDay.DUSK        -> SunStyle(
+            Color.argb(230, 240, 100,  30), Color.argb(210, 200,  40,  10),
+            Color.argb(90,  180,  30,   0), Color.argb(42,  140,  15,   0), 42, 6)
+        TimeOfDay.NIGHT       -> SunStyle(0, 0, 0, 0, 0, 0)
     }
 
     internal fun drawSun(canvas: Canvas, w: Int, h: Int, timeOfDay: TimeOfDay) {
         val style = sunStyle(timeOfDay)
-        if (Color.alpha(style.disk) == 0) return
+        if (Color.alpha(style.diskCenter) == 0) return
 
-        val cx = w * HUD_X_FRAC;  val cy = h * HUD_Y_FRAC
+        val cx = w * HUD_X_FRAC
+        val cy = h * HUD_Y_FRAC
         val r  = h * HUD_R_FRAC
 
-        // Outer atmospheric glow
-        paint.shader = RadialGradient(cx, cy, r * 14f,
-            style.outer, Color.TRANSPARENT, Shader.TileMode.CLAMP)
+        // Wide atmospheric diffusion — bleeds across a large area of sky
+        paint.shader = RadialGradient(cx, cy, r * 20f,
+            style.atmosphere, Color.TRANSPARENT, Shader.TileMode.CLAMP)
         canvas.drawRect(0f, 0f, w.toFloat(), h.toFloat(), paint)
 
-        // Inner halo
-        paint.shader = RadialGradient(cx, cy, r * 4.5f,
-            style.inner, Color.TRANSPARENT, Shader.TileMode.CLAMP)
-        canvas.drawRect(cx - r * 5f, cy - r * 5f, cx + r * 5f, cy + r * 5f, paint)
+        // Corona halo
+        paint.shader = RadialGradient(cx, cy, r * 5.5f,
+            style.halo, Color.TRANSPARENT, Shader.TileMode.CLAMP)
+        canvas.drawRect(cx - r * 6f, cy - r * 6f, cx + r * 6f, cy + r * 6f, paint)
         paint.shader = null
 
-        // Disk with radial gradient (bright centre → tinted edge)
+        // Corona rays — alternating long/short for a natural starburst
+        if (style.rayAlpha > 0) {
+            paint.strokeCap = Paint.Cap.ROUND
+            paint.style = Paint.Style.STROKE
+            val total = style.nRays * 2
+            for (i in 0 until total) {
+                val angle  = i * (PI / total).toFloat()
+                val isLong = i % 2 == 0
+                val len    = r * (if (isLong) 2.6f else 1.4f)
+                val alpha  = if (isLong) style.rayAlpha else style.rayAlpha / 2
+                paint.color      = Color.argb(alpha, 255, 252, 210)
+                paint.strokeWidth = h * (if (isLong) 0.0024f else 0.0014f)
+                val ix = cos(angle); val iy = sin(angle)
+                canvas.drawLine(cx + ix * r * 1.3f, cy + iy * r * 1.3f,
+                                cx + ix * (r + len), cy + iy * (r + len), paint)
+            }
+            paint.style    = Paint.Style.FILL
+            paint.strokeCap = Paint.Cap.BUTT
+        }
+
+        // Disk with limb-darkening (brighter white centre → warm tinted rim)
         paint.shader = RadialGradient(cx, cy, r,
-            Color.argb(255, 255, 255, 255), style.disk, Shader.TileMode.CLAMP)
+            intArrayOf(style.diskCenter, style.diskCenter, style.diskEdge),
+            floatArrayOf(0f, 0.45f, 1f),
+            Shader.TileMode.CLAMP)
         canvas.drawCircle(cx, cy, r, paint)
         paint.shader = null
-
-        // Corona rays
-        if (style.rayAlpha > 0) {
-            paint.color = Color.argb(style.rayAlpha, 255, 250, 200)
-            paint.strokeWidth = h * 0.0018f
-            paint.style = Paint.Style.STROKE
-            val rayLen = r * 2.0f
-            for (i in 0 until style.nRays) {
-                val angle = i * (PI / style.nRays).toFloat()
-                val ix = cos(angle); val iy = sin(angle)
-                canvas.drawLine(cx + ix * r * 1.25f, cy + iy * r * 1.25f,
-                                cx + ix * (r + rayLen), cy + iy * (r + rayLen), paint)
-            }
-            paint.style = Paint.Style.FILL
-        }
     }
 
     // ─── Fixed HUD moon with real astronomical phase ──────────────────────────
 
     internal fun drawMoon(canvas: Canvas, w: Int, h: Int) {
-        val cx = w * HUD_X_FRAC;  val cy = h * HUD_Y_FRAC
+        val cx = w * HUD_X_FRAC
+        val cy = h * HUD_Y_FRAC
         val r  = h * HUD_R_FRAC
 
-        // Current moon phase [0..1]: 0 = new, 0.5 = full
         val phase = moonPhase()
+        val lit   = ((1.0 - cos(phase * 2 * PI)) / 2.0).toFloat()   // 0=new, 1=full
 
-        // Glow scales with illumination (full moon = brightest)
-        val lit    = ((1 - cos(phase * 2 * PI)) / 2).toFloat()  // 0=new, 1=full
-        val glowA  = (15 + lit * 45).toInt()
-        paint.shader = RadialGradient(cx, cy, r * 6f,
-            Color.argb(glowA, 190, 210, 255), Color.TRANSPARENT, Shader.TileMode.CLAMP)
-        canvas.drawRect(cx - r * 7f, cy - r * 7f, cx + r * 7f, cy + r * 7f, paint)
+        // Atmospheric glow — scales with how much of the disk is illuminated
+        val glowA = (22 + lit * 70).toInt()
+        paint.shader = RadialGradient(cx, cy, r * 8f,
+            Color.argb(glowA, 195, 215, 255), Color.TRANSPARENT, Shader.TileMode.CLAMP)
+        canvas.drawRect(cx - r * 9f, cy - r * 9f, cx + r * 9f, cy + r * 9f, paint)
         paint.shader = null
 
-        // Dark base (barely-lit new-moon disk)
-        paint.color = Color.argb(30, 50, 60, 100)
+        // Unlit disk — earthshine: very faint cold blue (visible on new/crescent moon)
+        paint.shader = RadialGradient(cx, cy, r,
+            Color.argb(60, 45, 60, 100), Color.argb(90, 28, 38, 75),
+            Shader.TileMode.CLAMP)
         canvas.drawCircle(cx, cy, r, paint)
+        paint.shader = null
 
-        // Lit portion using mathematically correct phase path
+        // Lit portion — realistic grayish-white lunar surface
         val litPath = moonLitPath(cx, cy, r, phase)
         paint.shader = RadialGradient(cx, cy, r,
-            Color.argb(230, 255, 255, 255), Color.argb(200, 220, 230, 255),
+            intArrayOf(
+                Color.argb(245, 255, 255, 252),
+                Color.argb(230, 235, 238, 245),
+                Color.argb(210, 210, 218, 232)
+            ),
+            floatArrayOf(0f, 0.55f, 1f),
             Shader.TileMode.CLAMP)
         canvas.drawPath(litPath, paint)
         paint.shader = null
 
-        // Subtle crater texture on lit portion (3 dots, consistent seed)
-        if (lit > 0.15f) {
-            val craterA = (lit * 28).toInt()
+        // Crater detail (visible only when enough surface is lit)
+        if (lit > 0.12f) {
             canvas.save()
             canvas.clipPath(litPath)
+            val craterA = (lit * 38).toInt()
             listOf(
-                Triple(-0.18f, -0.22f, 0.12f), Triple(0.25f,  0.10f, 0.08f),
-                Triple(-0.05f,  0.30f, 0.10f)
+                Triple(-0.20f, -0.26f, 0.11f),
+                Triple( 0.30f,  0.14f, 0.09f),
+                Triple(-0.07f,  0.34f, 0.10f),
+                Triple( 0.12f, -0.40f, 0.07f),
+                Triple(-0.38f,  0.20f, 0.06f)
             ).forEach { (dx, dy, rFrac) ->
-                paint.color = Color.argb(craterA, 160, 175, 200)
+                // Crater shadow
+                paint.color = Color.argb(craterA, 148, 162, 188)
                 canvas.drawCircle(cx + r * dx, cy + r * dy, r * rFrac, paint)
+                // Crater rim highlight
+                paint.color = Color.argb(craterA / 3, 225, 232, 248)
+                canvas.drawCircle(
+                    cx + r * (dx - rFrac * 0.35f),
+                    cy + r * (dy - rFrac * 0.35f),
+                    r * rFrac * 0.65f, paint)
             }
             canvas.restore()
         }
