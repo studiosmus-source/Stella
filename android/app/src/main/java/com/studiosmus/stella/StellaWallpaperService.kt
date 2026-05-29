@@ -34,13 +34,21 @@ class StellaWallpaperService : WallpaperService() {
         private var visible  = false
         private var lastFrameMs = 0L
 
-        private var bgBitmap: Bitmap?    = null
+        private var bgBitmap:    Bitmap?      = null
         private var weatherData: WeatherData? = null
-        private var receiverRegistered   = false
+        private var horizonFrac: Float        = 0.40f
+        private var receiverRegistered        = false
+
+        // ── Debug overrides (set from MainActivity secret panel) ─────────────
+        @Volatile private var debugCondition: WeatherCondition? = null
+        @Volatile private var debugTimeOfDay: TimeOfDay?        = null
 
         private val bgReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
-                handler.post { reloadBackground() }
+                when (intent.action) {
+                    ACTION_BG_CHANGED    -> handler.post { reloadBackground() }
+                    ACTION_DEBUG_CHANGED -> handler.post { reloadDebugOverrides() }
+                }
             }
         }
 
@@ -80,7 +88,10 @@ class StellaWallpaperService : WallpaperService() {
 
         override fun onSurfaceCreated(holder: SurfaceHolder) {
             if (!receiverRegistered) {
-                val filter = IntentFilter(ACTION_BG_CHANGED)
+                val filter = IntentFilter().apply {
+                    addAction(ACTION_BG_CHANGED)
+                    addAction(ACTION_DEBUG_CHANGED)
+                }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
                     registerReceiver(bgReceiver, filter, RECEIVER_NOT_EXPORTED)
                 else
@@ -89,6 +100,7 @@ class StellaWallpaperService : WallpaperService() {
                 receiverRegistered = true
             }
             reloadBackground()
+            reloadDebugOverrides()
         }
 
         override fun onSurfaceChanged(holder: SurfaceHolder, format: Int, w: Int, h: Int) {
@@ -114,7 +126,17 @@ class StellaWallpaperService : WallpaperService() {
         private fun reloadBackground() {
             val path = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 .getString(KEY_BG, null) ?: return
-            bgBitmap = WeatherRenderer.loadBackground(path, surfaceW, surfaceH)
+            val bmp = WeatherRenderer.loadBackground(path, surfaceW, surfaceH)
+            bgBitmap = bmp
+            if (bmp != null) horizonFrac = HorizonDetector.detect(bmp)
+        }
+
+        private fun reloadDebugOverrides() {
+            val p = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            debugCondition = p.getString(KEY_DEBUG_COND, null)
+                ?.let { runCatching { WeatherCondition.valueOf(it) }.getOrNull() }
+            debugTimeOfDay = p.getString(KEY_DEBUG_TOFD, null)
+                ?.let { runCatching { TimeOfDay.valueOf(it) }.getOrNull() }
         }
 
         private fun initParticles() {
@@ -149,17 +171,20 @@ class StellaWallpaperService : WallpaperService() {
         }
 
         private fun renderFrame(canvas: Canvas, dt: Float) {
-            val w = surfaceW; val h = surfaceH
-            val weather   = weatherData
-            val cal       = Calendar.getInstance()
-            val hour      = cal.get(Calendar.HOUR_OF_DAY)
-            val sunriseH  = weather?.sunriseHour ?: 6
-            val sunsetH   = weather?.sunsetHour  ?: 20
+            val w   = surfaceW; val h = surfaceH
+            val hz  = horizonFrac
+            val cal = Calendar.getInstance()
+            val hour     = cal.get(Calendar.HOUR_OF_DAY)
+            val sunriseH = weatherData?.sunriseHour ?: 6
+            val sunsetH  = weatherData?.sunsetHour  ?: 20
 
-            val timeOfDay = weather?.timeOfDay ?: run {
-                TimeOfDay.fromHour(hour, sunriseH, sunsetH)
-            }
-            val condition = weather?.condition
+            // Debug overrides take priority over fetched weather
+            val timeOfDay = debugTimeOfDay
+                ?: weatherData?.timeOfDay
+                ?: TimeOfDay.fromHour(hour, sunriseH, sunsetH)
+
+            val condition = debugCondition
+                ?: weatherData?.condition
                 ?: if (timeOfDay == TimeOfDay.NIGHT || timeOfDay == TimeOfDay.DUSK)
                        WeatherCondition.CLEAR_NIGHT else WeatherCondition.CLEAR_DAY
 
@@ -173,29 +198,26 @@ class StellaWallpaperService : WallpaperService() {
             // ── 2. Time-of-day sky gradient overlay ──────────────────────────
             ParticleSystem.drawTimeOverlay(canvas, timeOfDay, w, h)
 
-            // ── 3. Sun or Moon (behind clouds) ───────────────────────────────
+            // ── 3. Sun or Moon (positioned relative to detected horizon) ─────
             when (timeOfDay) {
-                TimeOfDay.MORNING, TimeOfDay.AFTERNOON, TimeOfDay.GOLDEN_HOUR ->
-                    ParticleSystem.drawSunArc(canvas, w, h, hour, sunriseH, sunsetH)
-                TimeOfDay.DAWN ->
-                    ParticleSystem.drawSunArc(canvas, w, h, hour, sunriseH, sunsetH)
-                TimeOfDay.DUSK ->
-                    ParticleSystem.drawSunArc(canvas, w, h, hour, sunriseH, sunsetH)
+                TimeOfDay.DAWN, TimeOfDay.MORNING,
+                TimeOfDay.AFTERNOON, TimeOfDay.GOLDEN_HOUR, TimeOfDay.DUSK ->
+                    ParticleSystem.drawSunArc(canvas, w, h, hour, sunriseH, sunsetH, hz)
                 TimeOfDay.NIGHT ->
                     if (condition == WeatherCondition.CLEAR_NIGHT)
-                        ParticleSystem.drawMoon(canvas, w, h)
+                        ParticleSystem.drawMoon(canvas, w, h, hz)
                 else -> {}
             }
 
-            // ── 4. Stars (clear night only) ───────────────────────────────────
+            // ── 4. Stars above horizon only ───────────────────────────────────
             if (condition == WeatherCondition.CLEAR_NIGHT)
-                ParticleSystem.drawNightOverlay(canvas, w, h, System.currentTimeMillis() / 3_600_000)
+                ParticleSystem.drawNightOverlay(canvas, w, h, System.currentTimeMillis() / 3_600_000, hz)
 
-            // ── 5. Clouds ────────────────────────────────────────────────────
+            // ── 5. Clouds (capped at horizon) ─────────────────────────────────
             val (cloudDensity, stormLevel) = cloudParams(condition)
             if (cloudDensity > 0f) {
                 clouds?.update(dt)
-                clouds?.draw(canvas, cloudDensity, stormLevel)
+                clouds?.draw(canvas, cloudDensity, stormLevel, hz)
             }
 
             // ── 6. Weather particle effects ───────────────────────────────────
@@ -241,17 +263,17 @@ class StellaWallpaperService : WallpaperService() {
         }
 
         private fun cloudParams(cond: WeatherCondition): Pair<Float, Float> = when (cond) {
-            WeatherCondition.CLEAR_DAY                                  -> 0.12f to 0.0f
-            WeatherCondition.CLEAR_NIGHT                                -> 0.05f to 0.0f
+            WeatherCondition.CLEAR_DAY                                               -> 0.12f to 0.0f
+            WeatherCondition.CLEAR_NIGHT                                             -> 0.05f to 0.0f
             WeatherCondition.PARTLY_CLOUDY_DAY, WeatherCondition.PARTLY_CLOUDY_NIGHT -> 0.55f to 0.0f
-            WeatherCondition.OVERCAST                                   -> 0.92f to 0.25f
-            WeatherCondition.DRIZZLE                                    -> 0.72f to 0.35f
-            WeatherCondition.RAIN                                       -> 0.88f to 0.55f
-            WeatherCondition.HEAVY_RAIN                                 -> 1.00f to 0.72f
-            WeatherCondition.SNOW, WeatherCondition.HEAVY_SNOW          -> 0.80f to 0.05f
-            WeatherCondition.THUNDERSTORM                               -> 1.00f to 1.00f
-            WeatherCondition.HAIL                                       -> 1.00f to 0.90f
-            WeatherCondition.FOG                                        -> 0.30f to 0.10f
+            WeatherCondition.OVERCAST                                                -> 0.92f to 0.25f
+            WeatherCondition.DRIZZLE                                                 -> 0.72f to 0.35f
+            WeatherCondition.RAIN                                                    -> 0.88f to 0.55f
+            WeatherCondition.HEAVY_RAIN                                              -> 1.00f to 0.72f
+            WeatherCondition.SNOW, WeatherCondition.HEAVY_SNOW                       -> 0.80f to 0.05f
+            WeatherCondition.THUNDERSTORM                                            -> 1.00f to 1.00f
+            WeatherCondition.HAIL                                                    -> 1.00f to 0.90f
+            WeatherCondition.FOG                                                     -> 0.30f to 0.10f
         }
 
         private fun glassIntensity(cond: WeatherCondition): Float = when (cond) {
@@ -265,9 +287,12 @@ class StellaWallpaperService : WallpaperService() {
     }
 
     companion object {
-        const val PREFS           = "StellaPrefs"
-        const val KEY_BG          = "live_bg"
-        const val ACTION_BG_CHANGED = "com.studiosmus.stella.ACTION_BG_CHANGED"
+        const val PREFS              = "StellaPrefs"
+        const val KEY_BG             = "live_bg"
+        const val KEY_DEBUG_COND     = "debug_cond"
+        const val KEY_DEBUG_TOFD     = "debug_tofd"
+        const val ACTION_BG_CHANGED    = "com.studiosmus.stella.ACTION_BG_CHANGED"
+        const val ACTION_DEBUG_CHANGED = "com.studiosmus.stella.ACTION_DEBUG_CHANGED"
         private const val FRAME_MS = 16L
     }
 }

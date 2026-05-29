@@ -1,6 +1,7 @@
 package com.studiosmus.stella
 
 import android.Manifest
+import android.app.AlertDialog
 import android.app.WallpaperManager
 import android.content.ComponentName
 import android.content.Intent
@@ -9,6 +10,10 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.View
+import android.widget.ArrayAdapter
+import android.widget.LinearLayout
+import android.widget.Spinner
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -27,6 +32,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private var savedImagePath: String? = null
     private var cachedWeather: WeatherData? = null
+
+    // Secret: 7 taps on the title within 3 seconds opens the debug panel
+    private var tapCount   = 0
+    private var lastTapMs  = 0L
 
     private val photoPicker = registerForActivityResult(
         ActivityResultContracts.PickVisualMedia()
@@ -59,6 +68,14 @@ class MainActivity : AppCompatActivity() {
         binding.btnPickImage.setOnClickListener { pickImage() }
         binding.btnSetWallpaper.setOnClickListener { setLiveWallpaper() }
         binding.btnSetWallpaper.isEnabled = savedImagePath != null
+
+        // Secret tap sequence: 7 taps on title within 3 s → debug panel
+        binding.tvTitle.setOnClickListener {
+            val now = System.currentTimeMillis()
+            if (now - lastTapMs > 3000L) tapCount = 0
+            lastTapMs = now
+            if (++tapCount >= 7) { tapCount = 0; showDebugDialog() }
+        }
 
         requestLocationAndLoad()
     }
@@ -138,5 +155,65 @@ class MainActivity : AppCompatActivity() {
             )
         }
         startActivity(intent)
+    }
+
+    private fun showDebugDialog() {
+        val prefs = getSharedPreferences(StellaWallpaperService.PREFS, MODE_PRIVATE)
+
+        val condLabels = arrayOf("Auto (reale)") +
+            WeatherCondition.values().map { it.label }.toTypedArray()
+        val tofdLabels = arrayOf("Auto (reale)") +
+            TimeOfDay.values().map { it.name.lowercase().replaceFirstChar { c -> c.uppercase() } }
+                .toTypedArray()
+
+        val savedCond = prefs.getString(StellaWallpaperService.KEY_DEBUG_COND, null)
+        val savedTofd = prefs.getString(StellaWallpaperService.KEY_DEBUG_TOFD, null)
+        val condSel = WeatherCondition.values().indexOfFirst { it.name == savedCond }
+            .let { if (it < 0) 0 else it + 1 }
+        val tofdSel = TimeOfDay.values().indexOfFirst { it.name == savedTofd }
+            .let { if (it < 0) 0 else it + 1 }
+
+        val ctx = this
+        val layout = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(60, 32, 60, 8)
+        }
+
+        val tvCond = TextView(ctx).apply { text = "Condizione meteo"; textSize = 13f }
+        val spinCond = Spinner(ctx).apply {
+            adapter = ArrayAdapter(ctx, android.R.layout.simple_spinner_dropdown_item, condLabels)
+            setSelection(condSel)
+        }
+        val tvTofd = TextView(ctx).apply {
+            text = "Orario del giorno"; textSize = 13f
+            setPadding(0, 24, 0, 0)
+        }
+        val spinTofd = Spinner(ctx).apply {
+            adapter = ArrayAdapter(ctx, android.R.layout.simple_spinner_dropdown_item, tofdLabels)
+            setSelection(tofdSel)
+        }
+
+        layout.addView(tvCond);  layout.addView(spinCond)
+        layout.addView(tvTofd); layout.addView(spinTofd)
+
+        AlertDialog.Builder(ctx)
+            .setTitle("Debug meteo")
+            .setView(layout)
+            .setPositiveButton("Applica") { _, _ ->
+                val newCond = if (spinCond.selectedItemPosition == 0) null
+                    else WeatherCondition.values()[spinCond.selectedItemPosition - 1].name
+                val newTofd = if (spinTofd.selectedItemPosition == 0) null
+                    else TimeOfDay.values()[spinTofd.selectedItemPosition - 1].name
+                prefs.edit().also { ed ->
+                    if (newCond != null) ed.putString(StellaWallpaperService.KEY_DEBUG_COND, newCond)
+                    else ed.remove(StellaWallpaperService.KEY_DEBUG_COND)
+                    if (newTofd != null) ed.putString(StellaWallpaperService.KEY_DEBUG_TOFD, newTofd)
+                    else ed.remove(StellaWallpaperService.KEY_DEBUG_TOFD)
+                }.apply()
+                sendBroadcast(Intent(StellaWallpaperService.ACTION_DEBUG_CHANGED))
+                savedImagePath?.let { updatePreview(it) }
+            }
+            .setNegativeButton("Annulla", null)
+            .show()
     }
 }

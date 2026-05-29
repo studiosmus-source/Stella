@@ -8,6 +8,7 @@ import android.graphics.RadialGradient
 import android.graphics.Shader
 import kotlin.math.cos
 import kotlin.math.pow
+import kotlin.math.abs
 import kotlin.math.sin
 import kotlin.random.Random
 
@@ -139,14 +140,18 @@ object ParticleSystem {
      */
     internal fun drawSunArc(
         canvas: Canvas, w: Int, h: Int,
-        hour: Int, sunriseHour: Int, sunsetHour: Int
+        hour: Int, sunriseHour: Int, sunsetHour: Int,
+        horizonFrac: Float = 0.40f
     ) {
         val fraction = ((hour - sunriseHour).toFloat() /
             (sunsetHour - sunriseHour).coerceAtLeast(1)).coerceIn(0f, 1f)
 
         val sunX = w * (0.08f + fraction * 0.84f)
-        // Parabola: peaks at center-top, touches horizon at edges
-        val sunY = h * (0.03f + 0.28f * (1f - 4f * (fraction - 0.5f).pow(2)))
+        // Correct arc: low (near horizon) at sunrise/sunset, high at noon.
+        // arcTop = noon height, arcBot = sunrise/sunset height near detected horizon.
+        val arcTop = h * 0.04f
+        val arcBot = (h * horizonFrac * 0.82f).coerceIn(h * 0.18f, h * 0.42f)
+        val sunY   = arcTop + (arcBot - arcTop) * 4f * (fraction - 0.5f).pow(2)
 
         // Far outer glow (warm)
         paint.shader = RadialGradient(sunX, sunY, h * 0.55f,
@@ -179,9 +184,9 @@ object ParticleSystem {
         }
         paint.style = Paint.Style.FILL
 
-        // Horizon warmth when sun is low (< 20% or > 80% of day)
-        val lowness = (1f - 2f * kotlin.math.abs(fraction - 0.5f)).coerceIn(0f, 1f)
-        val horizonAlpha = ((1f - lowness) * 60f).toInt().coerceIn(0, 60)
+        // Horizon warmth: maximum at sunrise/sunset, zero at noon
+        val horizonAlpha = ((1f - (1f - 2f * abs(fraction - 0.5f)).coerceIn(0f, 1f)) * 60f)
+            .toInt().coerceIn(0, 60)
         if (horizonAlpha > 5) {
             paint.shader = LinearGradient(0f, h * 0.6f, 0f, h.toFloat(),
                 Color.TRANSPARENT, Color.argb(horizonAlpha, 255, 90, 10), Shader.TileMode.CLAMP)
@@ -192,8 +197,10 @@ object ParticleSystem {
 
     // ─── Moon ────────────────────────────────────────────────────────────────
 
-    internal fun drawMoon(canvas: Canvas, w: Int, h: Int) {
-        val moonX = w * 0.72f; val moonY = h * 0.12f
+    internal fun drawMoon(canvas: Canvas, w: Int, h: Int, horizonFrac: Float = 0.40f) {
+        val moonX = w * 0.72f
+        // Moon sits in the upper sky, well above the detected horizon
+        val moonY = (h * horizonFrac * 0.26f).coerceIn(h * 0.06f, h * 0.16f)
         val r = h * 0.032f
 
         // Glow
@@ -213,13 +220,14 @@ object ParticleSystem {
 
     // ─── Stars with twinkling ────────────────────────────────────────────────
 
-    internal fun drawNightOverlay(canvas: Canvas, w: Int, h: Int, seed: Long) {
-        val rng = Random(seed / 60)
+    internal fun drawNightOverlay(canvas: Canvas, w: Int, h: Int, seed: Long, horizonFrac: Float = 0.40f) {
+        val rng   = Random(seed / 60)
         val count = w * h / 3200
+        val skyH  = h * horizonFrac.coerceAtMost(0.75f)  // stars only above horizon
         val twinkle = ((System.currentTimeMillis() % 4000L) / 4000f) * 2 * Math.PI.toFloat()
         repeat(count) {
             val x = rng.nextFloat() * w
-            val y = rng.nextFloat() * h * 0.75f
+            val y = rng.nextFloat() * skyH
             val r = rng.nextFloat() * 1.6f + 0.4f
             val baseA = rng.nextFloat() * 180 + 70
             val phase = rng.nextFloat() * Math.PI.toFloat() * 2

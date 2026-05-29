@@ -66,7 +66,7 @@ class CloudSystem(private val w: Int, private val h: Int) {
         for (l in layers) l.offset = (l.offset + l.speed * dt) % TEX_W
     }
 
-    fun draw(canvas: Canvas, density: Float, stormLevel: Float = 0f) {
+    fun draw(canvas: Canvas, density: Float, stormLevel: Float = 0f, horizonFrac: Float = 0.40f) {
         if (!ready || density <= 0f) return
 
         val cf = if (stormLevel > 0.05f) {
@@ -75,26 +75,33 @@ class CloudSystem(private val w: Int, private val h: Int) {
         } else null
         drawPaint.colorFilter = cf
 
+        val horizonPx = h * horizonFrac
+
         for (layer in layers) {
             val tex = layer.texture ?: continue
             val alpha = (density * 255).toInt().coerceIn(0, 255)
             drawPaint.alpha = alpha
 
-            val srcX = layer.offset.toInt().coerceIn(0, TEX_W - 1)
+            val srcX   = layer.offset.toInt().coerceIn(0, TEX_W - 1)
             val dstTop = h * layer.yFrac
-            val dstBot = dstTop + h * layer.hFrac
+            val dstBot = (dstTop + h * layer.hFrac).coerceAtMost(horizonPx)
+            if (dstBot <= dstTop) continue   // collapsed above horizon → skip
+
+            // Source rect proportionally cropped to match destination height
+            val srcFrac = (dstBot - dstTop) / (h * layer.hFrac)
+            val srcBot  = (tex.height * srcFrac).toInt().coerceAtMost(tex.height)
 
             // First segment: [srcX .. TEX_W]
             val seg1W = (TEX_W - srcX).coerceAtMost(w)
             canvas.drawBitmap(tex,
-                Rect(srcX, 0, srcX + seg1W, tex.height),
+                Rect(srcX, 0, srcX + seg1W, srcBot),
                 RectF(0f, dstTop, seg1W.toFloat(), dstBot), drawPaint)
 
             // Second segment (wrap-around): [0 .. remainder]
             if (seg1W < w) {
                 val seg2W = (w - seg1W).coerceAtMost(TEX_W)
                 canvas.drawBitmap(tex,
-                    Rect(0, 0, seg2W, tex.height),
+                    Rect(0, 0, seg2W, srcBot),
                     RectF(seg1W.toFloat(), dstTop, w.toFloat(), dstBot), drawPaint)
             }
         }
