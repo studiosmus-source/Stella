@@ -312,7 +312,20 @@
     }
 
     // Init
-    document.getElementById('btnSalva').onclick = aggiungiNC;
+    var btnSalva = document.getElementById('btnSalva');
+    if (btnSalva) {
+        btnSalva.onclick = aggiungiNC;
+    } else {
+        alert('ERRORE: pulsante non trovato. Segnala questo messaggio.');
+    }
+
+    try {
+        localStorage.setItem('_test', '1');
+        localStorage.removeItem('_test');
+    } catch(e) {
+        alert('ATTENZIONE: il salvataggio dati non e\' disponibile in questo browser/modalita\'. Prova ad aprire il file direttamente da Chrome (trascina il file nel browser).');
+    }
+
     mostraRegistro();
 </script>
 
